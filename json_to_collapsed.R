@@ -16,9 +16,6 @@ df <- collapse_vcdb(vcdb)
 
 
 # Column pruning
-In the next sections useless columns are thrown. Ambiguous column are kept, 
-accompanied by a relevant explanation. The pruning takes place for each category
-separately
 
 ## Actor
 
@@ -28,7 +25,7 @@ df$actor.partner.industry <- NULL
 #df$actor.partner.motive <- NULL
 df$actor.partner.notes <- NULL
 df$actor.partner.region <- NULL
-df$actor.partner.country <- NULL
+df$actor.partner.country <- df$actor.partner.country
 df$actor.partner.industry2 <- NULL
 df$actor.partner.industry3 <- NULL
 
@@ -36,17 +33,16 @@ df$actor.external.industry <- NULL
 #df$actor.external.motive <- NULL
 df$actor.external.name <- NULL
 df$actor.external.notes <- NULL
-df$actor.external.country <- NULL
+df$actor.external.country <- df$actor.external.country
 df$actor.external.region <- NULL
-df$actor.external.variety <- NULL
+df$actor.external.variety <- df$actor.external.variety 
 
 df$actor.internal.job_change <- NULL
 df$actor.internal.notes <- NULL
-df$actor.internal.variety <- NULL
+df$actor.internal.variety <- df$actor.internal.variety
 #df$actor.internal.motive <- NULL
 
 df$actor.unknown.notes <- NULL
-```
 
 ## Attribute
 
@@ -92,7 +88,7 @@ df$asset_os <- df$asset_os
 # keep it in in case you can infer the amount from other info (most are 0)
 df$asset.total_amount <- df$asset.total_amount
 # garbage
-df$asset.hosting <- NULL
+df$asset.hosting <- df$asset.hosting
 df$asset.country <- NULL
 df$asset.management <- NULL
 df$asset.notes <- NULL
@@ -240,7 +236,6 @@ df$out.variety <-NULL
 
 
 ## Save csv for python processing
-
 
 con <- file("C:/Ubuntu/Dev/Windows/VERIS/csv/Rcollapsed.csv", encoding="UTF-8")
 write.csv(df, file=con, row.names = T)
