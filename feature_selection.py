@@ -121,7 +121,7 @@ graph.render("Confidentiality loss")
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.feature_selection import SelectFromModel
 
-clf = ExtraTreesClassifier(n_estimators=20,max_depth=2)
+clf = ExtraTreesClassifier(n_estimators=20, max_depth=2)
 clf = clf.fit(X, y)
 clf.feature_importances_
 model = SelectFromModel(clf, prefit=True)
@@ -131,10 +131,9 @@ X_new = pd.DataFrame(data=X_new, columns=cols)
 
 importance = list(clf.feature_importances_)
 colum = list(X.columns)
-out = pd.DataFrame(list(zip(colum, importance)),columns =['Feature', 'Importance'])
+out = pd.DataFrame(list(zip(colum, importance)), columns=['Feature', 'Importance'])
+
 from sklearn.feature_selection import SelectKBest
-
-
 kbest = SelectKBest(k=5)
 X_new2 = kbest.fit_transform(X, y)
 cols = X.columns[kbest.get_support()]
