@@ -3,7 +3,7 @@ import pandas as pd
 from verispy import VERIS
 from create_csv import create_veris_csv
 import argparse
-import sys
+import numpy as np
 
 # from create_csv import create_veris_csv
 
@@ -17,8 +17,7 @@ COLUMNS_TO_DROP_BY_TERM = ["cve",
                            "incident_id",
                            "plus"]
 
-COLUMNS_TO_DROP = ["pattern",
-                   "actor.partner.country",
+COLUMNS_TO_DROP = ["actor.partner.country",
                    "actor.external.country",
                    "action.unknown.result",
                    "asset.hosting",
@@ -32,7 +31,7 @@ COLUMNS_TO_MANAGE_TIME = ["attribute.availability.duration",
                           "timeline.compromise",
                           "timeline.discovery"]
 
-RECREATE_VERIS = True
+RECREATE_VERIS = False
 
 NEW_NAN = "NA"
 
@@ -87,7 +86,6 @@ class DataFrameHandler:
         self.collapsed = collapsed
         self.new_unknown_value = new_unknown_value
         self.new_nan = new_nan
-
 
     def replace_with (self, columns, to_replace='Unknown'):
         #self.collapsed = self.collapsed_ if inplace else self.collapsed_.copy()
@@ -145,41 +143,7 @@ class DataFrameHandler:
                                                                                           self.new_nan)
         return self.collapsed
 
-    # def unify_results(self):
-    #     """ This function creates 3 One Hot columns
-    #     (action.result.elevate, action.result.infiltrate, action.result.exfiltrate)
-    #     concerning the action result and drops all the others"
-    #     """
-    #
-    #     def unify(input_row): # input row is a pd.Series()
-    #         return sum(input_row) > 0
-    #
-    #     #self.collapsed = self.collapsed_ if inplace else self.collapsed_.copy()
-    #
-    #     infiltrate_cols = df_columns_that_contain_term("result.Infiltrate", veris_df)
-    #     exfiltrate_cols = df_columns_that_contain_term("result.Exfiltrate", veris_df)
-    #     elevate_cols = df_columns_that_contain_term("result.Elevate", veris_df)
-    #
-    #     """
-    #     Exfiltrate is True if the sum of labels (0,1) of all columns relevant to Exfiltrate (columns that contain the
-    #     term "result.Exfiltrate") is > 0. This means that at least one exfiltrate column is True
-    #     (originating from a particular action) and this is enough to decide given that actions are mutually exlusive. (NOT!)
-    #     The only problem according to the dataset is when an action has MULTIPLE results and this method takes that
-    #     into account. Same for the other 2 results.
-    #     """
-    #     self.collapsed["action.result.exfiltrate"] = veris_df.apply(lambda x: unify(input_row=x[infiltrate_cols]),
-    #                                                                 axis=1)
-    #     self.collapsed["action.result.infiltrate"] = veris_df.apply(lambda x: unify(input_row=x[exfiltrate_cols]),
-    #                                                                 axis=1)
-    #     self.collapsed["action.result.elevate"] = veris_df.apply(lambda x: unify(input_row=x[elevate_cols]),
-    #                                                               axis=1)
-    #     # drop initial result columns
-    #     self.collapsed.drop(columns=df_columns_that_end_with(".result", self.collapsed),
-    #                         inplace=True)
-    #     return self.collapsed
-
     def manage_malware_name_nans (self):
-
         def replace_malware_nan (action_malware, malware_name):
             if not(isinstance(malware_name, str)):
                 if action_malware == 1:
@@ -193,8 +157,24 @@ class DataFrameHandler:
                                 axis=1)
         return self.collapsed
 
-    def convert_time (self, columns, drop=True):
+    def collapse_column(self, row, father_col):
+        """lambda function to be used on with apply on veris_df row (=pd.Series())
+            for collapsing a boolean set of columns to one"""
+        row = row.filter(regex=f"^{father_col}")
+        if sum(row) > 1:
+            return "Multiple"
+        if sum(row) == 0:
+            return np.nan
+        return row.index[(row == 1)][0].split(".")[-1].title()
 
+    def remake_assets(self):
+        self.collapsed["asset.variety"] = \
+            self.veris_df.apply(lambda x: self.collapse_column(x, father_col="asset.variety"), axis=1)
+        self.collapsed["asset.assets.variety"] = \
+            self.veris_df.apply(lambda x: self.collapse_column(x, father_col="asset.assets.variety"), axis=1)
+        return self.collapsed
+
+    def convert_time (self, columns, drop=True):
         def to_seconds(unit, value, replace_unknown='?'):
             mapper = {'Seconds': 1,
                       'Minutes': 60,
@@ -239,28 +219,28 @@ if __name__ == "__main__":
     if args.recreate_veris:
         create_veris_csv(args.json_dir, args.csv_dir, "veris_df.csv")
     v = VERIS(json_dir=args.json_dir)
-    veris_df = pd.read_csv(os.path.join(args.csv_dir, "veris_df.csv"),
-                           index_col=0,
-                           low_memory=False)
 
     collapsed = pd.read_csv(os.path.join(args.csv_dir, "Rcollapsed.csv"),
                             sep=",",
                             encoding='utf-8',
                             index_col=0,
                             low_memory=False) \
-                    .reset_index(drop=True)
+                  .reset_index(drop=True)
+
+    veris_df = pd.read_csv(os.path.join(args.csv_dir, "veris_df.csv"),
+                           index_col=0,
+                           low_memory=False)
 
     etl = collapsed.copy()
 
-    # Dataset Curation
-
-    # filter out environmental incidents
-    collapsed = collapsed[collapsed["action"] != "Environmental"]
+    print(etl.shape)
+    print(veris_df.shape)
 
     # ETL using the handler
-
-    # Locate real and fake Unknown values (choose "?" symbol as new "Unknown")
     dfh = DataFrameHandler(veris_df=veris_df, collapsed=etl, new_unknown_value=NEW_UNKNOWN_VALUE)
+    # Correction of assets given that verisr2 does not get them right
+    etl = dfh.remake_assets()
+
     # Manage Unknown
     etl = dfh.manage_unknown(fathers=['action', 'actor'])
     etl = dfh.manage_malware_name_nans()
@@ -272,10 +252,14 @@ if __name__ == "__main__":
 
     # Manual ETL
 
+    # Add NAICS for industry
+    etl["industry"] = veris_df["victim.industry"]
+
     # Manually drop columns
-    print("The followind columns will be explicitly dropped:\n{}\n".
+    print("The following columns will be explicitly dropped:\n{}\n".
           format(COLUMNS_TO_DROP))
     etl = etl.drop(columns=COLUMNS_TO_DROP)
+
     # Manually replace remaining nans and Unknowns in a meaningful manner
     # motive
     motive_cols = etl.filter(regex=(r'\bmotive\b'), axis=1).columns
@@ -300,9 +284,10 @@ if __name__ == "__main__":
     etl["timeline.containment.unit"].fillna(NEW_UNKNOWN_VALUE, inplace=True)
     etl["timeline.incident.month"].fillna(NEW_UNKNOWN_VALUE, inplace=True)
     etl["pattern_collapsed"].fillna(NEW_UNKNOWN_VALUE, inplace=True)
+    #etl["victim.region"] =
 
     # what remains as Unknown is considered as truly Unknown -> "?"
-    print("The followind columns will explicitly have Unknown replaced with {}:\n{}\n".
+    print("The following columns will explicitly have Unknown replaced with {}:\n{}\n".
           format(NEW_UNKNOWN_VALUE, etl.columns[(etl.values == 'Unknown').any(0)].tolist()))
     etl.replace('Unknown', NEW_UNKNOWN_VALUE, inplace=True)
     etl.replace('unknown', NEW_UNKNOWN_VALUE, inplace=True)
