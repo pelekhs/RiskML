@@ -3,7 +3,7 @@ library(verisr)
 library(verisr2)
 
 # jsontoveris
-vcdb.dir <- "../VCDB/data/json/validated"
+vcdb.dir <- "../VCDB/data/json/validated/"
 # may optionally load a custom json schema file.
 if (interactive()) { # show progress bar if the session is interactive
   vcdb <- json2veris(dir=vcdb.dir, schema="../VCDB/vcdb-merged.json", progressbar=TRUE)
@@ -11,9 +11,10 @@ if (interactive()) { # show progress bar if the session is interactive
   vcdb <- json2veris(dir=vcdb.dir, schema="../VCDB/vcdb-merged.json")  
 }
 
+
+
 # Collapse vcdb to a more compact data.frame (df)
 df <- collapse_vcdb(vcdb)
-
 
 # Column pruning
 
@@ -37,7 +38,7 @@ df$actor.external.country <- df$actor.external.country
 df$actor.external.region <- NULL
 df$actor.external.variety <- df$actor.external.variety 
 
-df$actor.internal.job_change <- NULL
+df$actor.internal.job_change <- df$actor.internal.job_change
 df$actor.internal.notes <- NULL
 df$actor.internal.variety <- df$actor.internal.variety
 #df$actor.internal.motive <- NULL
