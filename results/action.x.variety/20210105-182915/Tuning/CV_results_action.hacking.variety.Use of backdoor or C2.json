@@ -1,0 +1,33 @@
+{
+    "best_scores": {
+        "SVM": 0.9382716049382716,
+        "Random Forest": 0.9506172839506173,
+        "LightGBM": 0.9629629629629629,
+        "kNN": 0.9382716049382716,
+        "Logistic Regression": 0.9506172839506173,
+        "Gaussian Naive Bayes": 0.38271604938271603
+    },
+    "best_params": {
+        "SVM": {
+            "C": 1,
+            "kernel": "linear"
+        },
+        "Random Forest": {
+            "bootstrap": true,
+            "max_depth": 16,
+            "max_features": "auto",
+            "min_samples_leaf": 1,
+            "min_samples_split": 12,
+            "n_estimators": 400
+        },
+        "LightGBM": {},
+        "kNN": {
+            "n_neighbors": 11,
+            "weights": "uniform"
+        },
+        "Logistic Regression": {
+            "max_iter": 100
+        },
+        "Gaussian Naive Bayes": {}
+    }
+}
