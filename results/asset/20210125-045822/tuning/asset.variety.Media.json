@@ -1,0 +1,35 @@
+{
+    "Tuning metric": "auc-micro",
+    "Best_scores": {
+        "SVM": 0.797127209360219,
+        "KNN": 0.7941299477221808,
+        "RF": 0.7924047796863332,
+        "LR": 0.8040776699029126,
+        "LGBM": 0.7908937017674882,
+        "GNB": 0.6340577545431915
+    },
+    "Best_params": {
+        "SVM": {
+            "C": 1,
+            "kernel": "linear"
+        },
+        "KNN": {
+            "metric": "minkowski",
+            "n_neighbors": 3,
+            "weights": "uniform"
+        },
+        "RF": {
+            "bootstrap": true,
+            "max_depth": 16,
+            "max_features": "auto",
+            "min_samples_leaf": 1,
+            "min_samples_split": 12,
+            "n_estimators": 100
+        },
+        "LR": {
+            "max_iter": 100
+        },
+        "LGBM": {},
+        "GNB": {}
+    }
+}

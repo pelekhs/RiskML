@@ -1,4 +1,4 @@
-from etl import JSON_DIR, CSV_DIR
+from globals import JSON_DIR, CSV_DIR
 from verispy import VERIS
 import pandas as pd
 import os
@@ -188,6 +188,8 @@ class preprocessor():
             self.df = ColToOneHot(self.df, self.veris_df, father_col="asset.assets.variety")
             self.df = self.df.drop(columns=["asset.assets.variety.Unknown"])
         # victim.industry
+        self.NAICS = None
+        self.industry_one_hot=None
         if "victim.industry" in predictors:
             if ind_one_hot:
                 self.NAICS = "You have requested one hot encoding so NAICS has no value"
@@ -251,5 +253,35 @@ def create_log_folder(pipeline, results_type="Tuning", results_root=os.curdir):
     save_dir = os.path.join(pipeline_dir, results_type)
     os.makedirs(save_dir)
     return save_dir
+
+def preprocessing(df, veris_df, 
+                  predictors , targets, 
+                  industry_one_hot, imputer):
+    # Data preprocessing = Feature selection, Imputation, One Hots etc...
+    ## Drop environmental and modify NAICS to 2 digits
+    pp = preprocessor(df, veris_df)
+    df, veris_df = pp.drop_environmental()
+    df = pp.round_NAICS(digits=2)
+
+    # Pipeline 2: Predict 1st level asset
+    ## Feature selection
+    dataset, veris_df = pp.add_predictors(predictors=predictors)
+
+    ###  Pipeline 2.1
+    #### Imputation method 1: Don't impute - just drop
+    dataset, veris_df = pp.imputer(method=imputer)
+
+    #### Define targets
+    ys = ColToOneHot(collapsed=dataset,
+                     veris_df=veris_df,
+                     father_col="asset.variety",
+                     replace=False)
+    ys, dataset, veris_df = pp.process_target(ys, targets=targets)
+    
+    #### One Hot Encoding and Scaling
+    X, NAICS, industry_one_hot = \
+        pp.one_hot_encode_and_scale(predictors=predictors,
+                                    ind_one_hot=industry_one_hot)
+    return X, ys
 
 

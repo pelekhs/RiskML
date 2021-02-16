@@ -1,0 +1,51 @@
+name: Thesis
+
+conda_env: conda.yml
+    
+entry_points:
+
+  etl_data:
+    parameters:
+      recreate_veris: {type: bool, default=False}
+    command: python3 etl.py --csv-dir {csv_dir} --json-dir {json_dir} --recreate-veris {recreate_veris}
+
+  ML_asset:
+    parameters:
+      predictors: {type: string, default: ' '}
+      train_size: {type: float, default: 0.8}
+      random_state: {type: int, default: -1}
+      metric: {type: string, default: 'f1'}
+      metric_averaging: {type: string, default: 'macro'}
+      model: {type: string, default: 'SVM'}
+    command: |
+        python3 ML_asset_l2.py --predictors {predictors} --random-state {random_state} --train-size {train_size} --metric {metric} --metric-averaging {metric_averaging}
+
+  ML_asset_l2:
+    parameters:
+      features: {type: string}
+      train_size: {type: float, default: 0.8}
+      tuning_metric: {type: string, default: 'f1'}
+      tuning_averaging: {type: string, default: 'macro'}
+    command: |
+        python3 ML_asset_l2.py --features {features} --stratify {stratify} --train-size {traini_size} --tuning-metric {tuning_metric} --tuning-averaging {tuning_averaging}
+
+    gridsearch:
+    parameters:
+      training_data: {type: string, default: '../csv/'}
+      metric: {type: string, default: 'accuracy'}
+      algo: {type: string, default: "tpe.suggest"}
+      seed: {type: int, default: 97531}
+    command: "python -O search_hyperopt.py {training_data}
+                                                 --max-runs {max_runs}
+                                                 --epochs {epochs}
+                                                 --metric {metric}
+                                                 --algo {algo}
+                                                 --seed {seed}"
+  main:
+    parameters:
+      ml_asset_algorithm: {type: string, default: "RF"}
+      ml_asset_l2_algorithm: {type: string, default: "SVM"}
+    command: |
+        python3 main.py \
+            --ml-asset-alg {ml_asset_algorithm} \
+            --ml-asset-l2-alg {ml_asset_l2_algorithm}

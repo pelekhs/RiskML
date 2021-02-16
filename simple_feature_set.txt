@@ -1,0 +1,8 @@
+{
+    "Collapsed features": [
+        "action",
+        "action.x.variety",
+        "victim.industry",
+        "victim.orgsize"
+    ]
+}

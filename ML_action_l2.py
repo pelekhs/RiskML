@@ -1,13 +1,9 @@
+# %%
 from sklearn.model_selection import train_test_split
 from hyperparameter_tuning import grouped_tuning
 from evaluation import grouped_evaluation
 from preprocessing import preprocessor, ColToOneHot, merge_low_frequency_columns, load_datasets
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from lightgbm import LGBMClassifier
-from sklearn.naive_bayes import GaussianNB
+from globals import *
 
 LEVEL1_CATEGORY = "Malware"
 RESULTS_DIR = "./results/"
@@ -95,21 +91,6 @@ if __name__ == "__main__":
     TUNE_AVERAGING = "macro"
     N_JOBS_CV = 6
     FOLDER_NAME = "action.x.variety"
-    PARAM_GRID = [dict(kernel=['rbf', 'linear'],
-                       C=[1, 10, 100]),
-                  dict(bootstrap=[True],
-                       max_depth=[16, 20, 24],
-                       max_features=['auto'],
-                       min_samples_leaf=[1, 2, 4],
-                       min_samples_split=[12, 16, 20],
-                       n_estimators=[100, 400]),
-                  dict(),
-                  dict(n_neighbors=[1, 3, 5, 7, 9, 11, 13, 15],
-                       weights=['uniform', 'distance'],
-                       metric=["minkowski", "hamming"]),
-                  dict(max_iter=[100, 300]),
-                  dict()
-                  ]
     if TUNE_METRIC in ["accuracy", "precision", "recall", "f1"]:
         tune_scores, tune_params = grouped_tuning(X_train, X_test, y_trains, y_tests,
                                                   results_dir=RESULTS_DIR, pipeline=FOLDER_NAME,
@@ -120,15 +101,6 @@ if __name__ == "__main__":
     ## Evaluation
     EVALUATION_METRIC = "f1"
     EVALUATION_AVERAGING = "macro"
-    MODELS = {
-        'SVM': SVC(C=10, kernel='rbf', probability=True),
-        'Knn': KNeighborsClassifier(n_neighbors=3, metric="hamming"),
-        'RF': RandomForestClassifier(max_depth=16, min_samples_leaf=1, min_samples_split=16, n_estimators=400),
-        'LR': LogisticRegression(),
-        'LGBM': LGBMClassifier(),
-        'GNB': GaussianNB()
-    }
-
     if EVALUATION_METRIC in ["accuracy", "precision", "recall", "f1"]:
         eval_scores = grouped_evaluation(X_train, X_test, y_trains, y_tests,
                                          evaluation_metric=EVALUATION_METRIC,
@@ -137,3 +109,5 @@ if __name__ == "__main__":
 
 # [".".join(["action", ACTION2.lower(), "variety", "Other"])])
 # action_features = df.filter(regex=("action\..*\.variety|^action$"), axis=1)
+
+# %%

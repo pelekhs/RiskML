@@ -4,13 +4,9 @@ from verispy import VERIS
 from create_csv import create_veris_csv
 import argparse
 import numpy as np
+import globals
 
 # from create_csv import create_veris_csv
-
-JSON_DIR = '../VCDB/data/json/validated/'
-
-CSV_DIR = "../csv/"
-
 COLUMNS_TO_DROP_BY_TERM = ["cve",
                            "asset.cloud",
                            "notes",
@@ -42,24 +38,22 @@ def parse_arguments ():
     parser = argparse.ArgumentParser(
         description="Risk assessment preprocessor"
     )
-    # we need to give the name of X file, and the y file as well.
-    # with alpha, it makes three parameters.
-    parser.add_argument("-j",
-                        "--json_dir",
-                        help="the directory containing the json files",
-                        default=JSON_DIR)
-    parser.add_argument("-c",
-                        "--csv_dir",
-                        help="the directory containing the csv files",
-                        default=CSV_DIR)
+    # parser.add_argument("-j",
+    #                     "--json_dir",
+    #                     help="the directory containing the json files",
+    #                     default=JSON_DIR)
+    # parser.add_argument("-c",
+    #                     "--csv_dir",
+    #                     help="the directory containing the csv files",
+    #                     default=CSV_DIR)
     parser.add_argument("-dt",
                         "--columns_to_drop_by_term",
-                        action='append',
+                        nargs='+',
                         help="terms (list like) that will cause any column containing them to be dropped",
                         default=COLUMNS_TO_DROP_BY_TERM)
     parser.add_argument("-d",
                         "--columns_to_drop",
-                        action='append',
+                        nargs='+',
                         help="columns names (list like) to directly drop",
                         default=COLUMNS_TO_DROP)
     parser.add_argument("-r",
@@ -212,9 +206,9 @@ class DataFrameHandler:
         return self.collapsed
 
 if __name__ == "__main__":
-
+    
+    # Parse arguments
     args = parse_arguments()
-
     # LOAD csv datasets from csv_dir
     if args.recreate_veris:
         create_veris_csv(args.json_dir, args.csv_dir, "veris_df.csv")
@@ -254,6 +248,11 @@ if __name__ == "__main__":
 
     # Add NAICS for industry
     etl["industry"] = veris_df["victim.industry"]
+
+    # Breach attributes
+    etl["attribute.confidentiality.data_disclosure.Yes"] = veris_df["attribute.confidentiality.data_disclosure.Yes"]
+    etl["attribute.confidentiality.data_disclosure.Potentially"] = veris_df["attribute.confidentiality.data_disclosure.Potentially"]
+    etl["attribute.confidentiality.data_total"] = veris_df["attribute.confidentiality.data_total"]
 
     # Manually drop columns
     print("The following columns will be explicitly dropped:\n{}\n".

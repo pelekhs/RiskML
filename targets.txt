@@ -1,0 +1,6 @@
+{
+    "Targets": [
+        "asset.variety.Server",
+        "asset.variety.User Dev"
+    ]
+}

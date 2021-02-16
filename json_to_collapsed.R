@@ -1,4 +1,3 @@
-setwd("C:/Ubuntu/Dev/Windows/VERIS/vcdb_datamining")
 library(verisr)
 library(verisr2)
 

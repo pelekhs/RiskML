@@ -1,119 +1,188 @@
-
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from lightgbm import LGBMClassifier
-import sys
+import sys, os
 import pandas as pd
 import json
 import pprint
 from sklearn.metrics import roc_curve, precision_recall_curve, auc, make_scorer
 from preprocessing import create_log_folder
-import os
-from sklearn.metrics import recall_score, accuracy_score, precision_score, f1_score, confusion_matrix
+from sklearn.svm import SVC
+import mlflow
+from globals import *
+from sklearn.metrics import recall_score, accuracy_score, \
+    precision_score, f1_score, confusion_matrix, roc_auc_score
+from sklearn.model_selection import train_test_split
+from evaluation import grouped_evaluation
+from globals import *
+from preprocessing import preprocessing, load_datasets
 
-# dict(hidden_layer_sizes=[(4, 4, 4), (4, 16, 16, 4), (16, 32, 32, 32, 16)],
-#     activation=['relu', 'tanh'], solver=['sgd', 'adam'], batch_size=[32],
-#     learning_rate=['adaptive']),dict(priors=[None, [0.5, 0.5], [0.2, 0.8], [0.8, 0.2]]),
+# Default Arguments
+## Preprocessing
+PREDICTORS = ['action', 'action.x.variety', 'victim.industry', 'victim.orgsize']
+TARGETS = ['asset.variety.Server', 'asset.variety.User Dev']#'asset.variety.Media',]
+INDUSTRY_ONE_HOT = True
+IMPUTER = 'dropnan'
+## Tuning
+METRIC = 'accuracy'
+AVERAGING = 'macro'
+N_JOBS_CV = 4
+README = True
+N_FOLDS = 5
+RANDOM_STATE=None # random state for cv
 
-MODELS = {'SVM': SVC(),
-          'Random Forest': RandomForestClassifier(n_jobs=-1),
-          'LightGBM': LGBMClassifier(n_jobs=-1),
-          'kNN': KNeighborsClassifier(n_jobs=-1),
-          'Logistic Regression': LogisticRegression(n_jobs=-1),
-          'Gaussian Naive Bayes': GaussianNB(),
-          }
-
-def ML_tuner_CV(X_train, X_test, y_train, y_test, scorer="accuracy", average=None,
-                n_jobs_cv=-1, param_grid=None, save_CV_results_as_json=None):
-    """  ML classifier hyperparameter tuning """
-    # Set scorers
+def get_scorer(metric, average):
     scorers = {
-        'precision': make_scorer(precision_score, average=average),
-        'recall': make_scorer(recall_score, average=average),
-        'accuracy': make_scorer(accuracy_score),
-        'f1': make_scorer(f1_score, average=average)
-    }
-    # Set the parameters of each model by cross-validation gridsearch
-    best_scores=[]
-    params={}
-    y_tests={}
-    # Below I locate the best svm classifiers for each kernel and the best knn classifier and compute their test score
-    print("Tuning hyper-parameters, based on accuracy, for various algorithms....")
-    pp = pprint.PrettyPrinter(indent=2)
-    skf = StratifiedKFold(n_splits=5)
-    for (a, tp, name) in list(zip(MODELS.values(), param_grid, MODELS.keys())):
-        print("\n{}\n--------------------".format(name))
-        print("Parameter grid:\n {}".format(tp))
-        clf = GridSearchCV(a, tp, cv=skf, scoring=scorers[scorer], n_jobs=n_jobs_cv)
-        clf.fit(X_train, y_train)
-        print("Mean CV performance of each parameter combination:")
-        performance = pd.DataFrame(clf.cv_results_['params'])
-        performance["Score"] = clf.cv_results_['mean_test_score']
-        print(performance)
-        print("\nBest parameters set found on training set:")
-        pp.pprint(clf.best_params_)
-        params[name] = clf.best_params_
-        print("\nThe scores are computed on the full evaluation set:")
-        #evaluate and store scores of estimators of each category on validation set
-        score = clf.score(X_test, y_test)
-        print(f"{scorer}-{average}: ", score)
-        best_scores.append(score)
-        y_tests[name] = y_test
-    final_scores = dict(zip(list(MODELS.keys()), best_scores))
-    print("\n\n=====================================================")
-    print("The best accuracies achieved by the algorithms are:\n{}\n".format(final_scores))
-    if save_CV_results_as_json:
-        results = {"Tuning metric": f"{scorer}-{average}",
-                   "Best_scores": final_scores,
-                   "Best_params": params}
-        with open(save_CV_results_as_json, 'w') as outfile:
-            json.dump(results, outfile, indent=4)
-    return final_scores, params
+              'precision': make_scorer(precision_score, average=average),
+              'recall': make_scorer(recall_score, average=average),
+              'accuracy': make_scorer(accuracy_score),
+              'f1': make_scorer(f1_score, average=average),
+              'auc': make_scorer(roc_auc_score, average=average)
+              }
+    return scorers[metric]
 
-def grouped_tuning(X_train, X_test, y_trains, y_tests, results_dir, pipeline,
-                param_grid, n_jobs_cv, tune_metric="accuracy", average=None, readme=None):
-    ### Create log folder for hyperparameter tuning
-    save_dir = create_log_folder(pipeline=pipeline,
-                                 results_type="tuning",
-                                 results_root=results_dir)
-    # Logging
+def mlflow_gridsearch(X, y, 
+                      estimator_dict,
+                      predictors,
+                      cv, 
+                      metric,
+                      average, 
+                      n_jobs, 
+                      random_state):
+
+    mlflow.sklearn.autolog()
+    clf = GridSearchCV(estimator=estimator_dict['class'],
+                       param_grid=estimator_dict['parameter_grid'],
+                       cv=cv, 
+                       scoring=get_scorer(metric, average), 
+                       refit=True,
+                       n_jobs=n_jobs)
+    with mlflow.start_run(run_name='gridsearch', nested=True) as run:
+        mlflow.set_tags({'estimator_family': estimator_dict['family_name'], 
+                         'target': y.name,
+                         'predictors': predictors, 
+                         'tuning_metric': f'{metric}_{average}'})
+        clf.fit(X, y)
+    return clf
+
+def ML_tuner_CV(X, y,  
+                models=MODELS, 
+                predictors=PREDICTORS,
+                metric=METRIC, 
+                average=AVERAGING,
+                n_jobs_cv=N_JOBS_CV, 
+                n_folds=N_FOLDS,
+                random_state=RANDOM_STATE): 
+
+    """  ML classifier hyperparameter tuning """
+    skf = StratifiedKFold(n_splits=n_folds, 
+                          random_state=random_state)
+    
+    # loop on estimators 
+    for estimator_dict in models:
+        print(f'\n{estimator_dict["family_name"]}\n--------------------')
+        # mlflow run on estimators
+        with mlflow.start_run(run_name='estimator loop', nested=True) as model_run:
+            mlflow.set_tags({'estimator_family': estimator_dict['family_name'], 
+                             'target': y.name,
+                             'predictors': predictors, 
+                             'tuning_metric': f'{metric}_{average}'})
+            clf = mlflow_gridsearch(X, y, 
+                                    estimator_dict, 
+                                    predictors,
+                                    skf, 
+                                    metric,
+                                    average,
+                                    n_jobs_cv, 
+                                    random_state)
+
+def grouped_search(X, y, 
+                   metric=METRIC,
+                   average=AVERAGING,
+                   n_jobs_cv=N_JOBS_CV,
+                   models=MODELS,
+                   predictors=PREDICTORS,
+                   n_folds=N_FOLDS,
+                   random_state=RANDOM_STATE,
+                   experiment_id=None,
+                   readme=True):
+    
+    # Custom Logging
     if readme:
-        results = {"Input features": X_train.columns.tolist(),
-                   "Targets": y_trains.columns.tolist()}
-        with open(os.path.join(os.path.dirname(save_dir), "ReadMe.txt"), 'w') as outfile:
-            json.dump(results, outfile, indent=4)
-    ### Tuning
-    final_scores = {}
-    params = {}
-    # Instead of scikit multioutput classifier
-    for target in y_trains.columns:
-        print("\n************************\n{}\n************************".format(target))
-        final_scores[target], params[target] = ML_tuner_CV(X_train, X_test,
-                                                     y_trains[target], y_tests[target],
-                                                     scorer=tune_metric,
-                                                     n_jobs_cv=n_jobs_cv,
-                                                     param_grid=param_grid,
-                                                     average=average,
-                                                     save_CV_results_as_json=os.path.join(os.path.normpath(save_dir),
-                                                                                          target + '.json'))
+        full_features = {'Full features': X.columns.tolist()}
+        collapsed_features = {'Collapsed features': predictors}
+        targets = {'Targets': y.columns.tolist()}
+        with open('full_feature_set.txt', 'w') as outfile:
+            json.dump(full_features, outfile, indent=4)
+        with open('simple_feature_set.txt', 'w') as outfile:
+            json.dump(collapsed_features, outfile, indent=4)
+        with open('targets.txt', 'w') as outfile:
+            json.dump(targets, outfile, indent=4)
+    
 
-    return final_scores, params
+    # initial logs
+    mlflow.start_run(experiment_id=experiment_id, 
+                     run_name='parent run')
+    mlflow.set_tags({'predictors':predictors, 
+                     'tuning_metric': f'{metric}_{average}'})
+    mlflow.log_artifact('full_feature_set.txt', artifact_path='features')
+    mlflow.log_artifact('simple_feature_set.txt', artifact_path='features')
+    mlflow.log_artifact('targets.txt', artifact_path='features')
+    
+    # loop over targets
+    for target in y.columns:
+        print(f'\n************************\n{target}\n************************')
+        with mlflow.start_run(run_name='target loop', nested=True) as target_run:
+            mlflow.set_tags({'target': target, 
+                             'predictors': predictors, 
+                             'tuning_metric': f'{metric}_{average}'})
+            # Single target tuning
+            ML_tuner_CV(X, y[target], 
+                        metric=metric,
+                        average=average,
+                        n_jobs_cv=n_jobs_cv,
+                        models=models,
+                        predictors=predictors, 
+                        n_folds=n_folds,
+                        random_state=random_state)
 
+if __name__ == '__main__':
 
-# if __name__=="__main__":
-#
-#     if len(sys.argv) < 5:
-#         print("NEED AS INPUTS: X_train, X_test, y_train, y_test. Exiting...")
-#         exit()
-#
-#     X_train = sys.argv[1]
-#     X_test = sys.argv[2]
-#     y_train = sys.argv[3]
-#     y_test = sys.argv[4]
-#
-#     ML_tuner_CV(X_train, X_test, y_train, y_test)
+    experiment_id = mlflow.set_experiment("skata")
+    #experiment_id = mlflow.set_experiment(TARGETS[0].split('.')[0])
+    
+    # Load data
+    df, veris_df = load_datasets()
+    
+    # Manage task predictors and features
+    if task == "asset.variety":
+        predictors = ['action', 
+                      'action.x.variety', 
+                      'victim.industry', 
+                      'victim.orgsize']
+        targets = veris_df.filter(like="asset.variety.").columns.tolist()
+        targets.remove("asset.variety.Embedded", 
+                       "asset.variety.Unknown"
+                       "asset.variety.Network")
+    elif task == "asset.assets.variety":
+    elif task == "action":
+    elif task == "action.x.variety" 
 
+    # Preprocessing
+    X, y = preprocessing(df, veris_df,
+                         PREDICTORS, 
+                         TARGETS, 
+                         INDUSTRY_ONE_HOT,
+                         IMPUTER)
+            
+
+    ## Hyperparameter tuning for training separate classifiers for each 2nd level action
+    if METRIC in ['auc', 'accuracy', 'precision', 'recall', 'f1']:
+            grouped_search(X, y, 
+                           metric=METRIC,
+                           average=AVERAGING,
+                           n_jobs_cv=N_JOBS_CV,
+                           models=MODELS,
+                           predictors=PREDICTORS, 
+                           n_folds=N_FOLDS,
+                           random_state=RANDOM_STATE,
+                           readme=README,
+                           experiment_id=experiment_id)
