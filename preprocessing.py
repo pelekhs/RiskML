@@ -1,52 +1,13 @@
-from globals import JSON_DIR, CSV_DIR
 from verispy import VERIS
 import pandas as pd
 import os
 import datetime
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, LabelBinarizer, StandardScaler
+from utils import load_datasets, mapper, ColToOneHot
+import re
 
-v = VERIS(json_dir=JSON_DIR)
-
-def load_datasets():
-    veris_df = pd.read_csv(os.path.join(CSV_DIR, "veris_df.csv"),
-                           index_col=0,
-                           low_memory=False)
-
-    df = pd.read_csv(os.path.join(CSV_DIR, "etl_product.csv"),
-                     low_memory=False,
-                     index_col=0)
-    return df, veris_df
-
-def mapper(x, asset_variety):
-    splitted = x.split(" - ")
-    splitted[0] = f"asset.assets.variety.{asset_variety}"
-    return ".".join(splitted)
-
-def ColToOneHot(collapsed, veris_df, father_col="action", replace=True) -> object:
-    if father_col.startswith("asset.assets.variety."):
-        asset_variety = father_col.split(".")[-1]
-        columns = veris_df.filter(like=f"asset.assets.variety.{asset_variety[0]} -").columns
-        renamed_columns = columns.map(lambda x: mapper(x, asset_variety))
-        renamer = dict(zip(columns.tolist(), renamed_columns.tolist()))
-        veris_df.rename(mapper=renamer,
-                        axis="columns",
-                        inplace=True)
-    if replace:
-        collapsed_ = collapsed.copy()
-        for attr in list(v.enum_summary(veris_df, father_col).iloc[:, 0]):
-            sub = father_col + "." + attr
-            collapsed_[sub] = veris_df[sub].astype(int)
-        collapsed_.drop(columns=father_col, inplace=True)
-        return collapsed_
-    else:
-        OneHot = pd.DataFrame()
-        for attr in list(v.enum_summary(veris_df, father_col).iloc[:, 0]):
-            sub = father_col + "." + attr
-            OneHot[sub] = veris_df[sub]
-        return OneHot.astype(int)
-
-# Nee to evolve into a class with methods
+# Need to evolve into a class with methods
 class preprocessor():
 
     def __init__ (self, df, veris_df):
@@ -79,10 +40,10 @@ class preprocessor():
             self.simple_nan_dropper()
         if method == "create unknown class":
             pass
-        return self.df, self.veris_df
+        return self.df, self.veris_df, self.y
 
     def simple_nan_dropper(self):
-        """ This function just replaces ? with nans and drops rows containing even one. It also stores
+        """ This function just replaces ? with nans and drops rows containing at least one. It also stores
         the deleted indices and drops them from veris_df as well"""
         self.df = self.df.replace(np.nan, "NA")
         self.df = self.df.replace("?", np.nan)
@@ -90,8 +51,9 @@ class preprocessor():
         ##### keep dropped rows and also drop them from veris_df
         dropped_rows = self.df[~self.df.index.isin(na_free.index)].index
         self.veris_df = self.veris_df.drop(dropped_rows)
+        self.y = self.y.drop(dropped_rows)
         self.df = na_free
-        return self.df, self.veris_df
+        return self.df, self.veris_df, self.y
 
     def filter_by_verisdf_col(self, column):
         """ This function gets a column name and filters dataset according to the column.
@@ -130,38 +92,80 @@ class preprocessor():
         self.df = dataset
         return self.df, self.veris_df
 
-    def process_target(self, ys, targets):
-        """ Default preprocessing and target selection method for multioutput target datasets"""
-        self.ys = ys
+    def fetch_target(self, target_name):
+        """ Default preprocessing respective to the selected target"""
+        self.y = self.veris_df[target_name]
         # locate rows to drop
-        rows_to_drop = np.ones(self.ys.shape[0]).astype(bool)
-        for target in targets:
-            # only delete rows that have values diff than 0,1 for the targets of interest
-            local_rows_to_drop_1 = (self.ys[target] != 0).values
-            local_rows_to_drop_2 = (self.ys[target] != 1).values
-            local_rows_to_drop = np.bitwise_and(local_rows_to_drop_1, local_rows_to_drop_2)
-            rows_to_drop = np.bitwise_and(local_rows_to_drop, rows_to_drop)
+        # delete rows that have values diff than 0,1 for the targets of interest
+        dirty_rows_1 = (self.y != 0).values
+        dirty_rows_2 = (self.y != 1).values
+        dirty_rows = np.bitwise_and(dirty_rows_1, dirty_rows_2)
+        # delete rows where the target's father is not activated (hierarchical classification model)
+        irrelevant_rows = np.zeros(len(self.y)).astype(bool)
+        if 'asset.assets.variety.' in target_name:
+            mapping = {'asset.assets.variety.S ': 'asset.variety.Server',
+                       'asset.assets.variety.T ': 'asset.variety.Kiosk/Term',
+                       'asset.assets.variety.U ': 'asset.variety.User Dev',
+                       'asset.assets.variety.M ': 'asset.variety.Media',
+                       'asset.assets.variety.P ': 'asset.variety.Person'}
+            father_col = mapping[target_name.split('-')[0]]
+            irrelevant_rows = \
+                (self.veris_df[father_col] == 0).values
+        elif re.match(r'action.*\.variety', target_name):
+            father_col = f'action.{target_name.split(".")[1].capitalize()}'
+            irrelevant_rows = \
+                (self.veris_df[father_col] == 0).values
+        
+        rows_to_drop = np.bitwise_or(irrelevant_rows, dirty_rows)
         rows_to_drop = np.where(rows_to_drop)[0].reshape(-1).tolist()
-        # Delete selected rows from all datasets
-        self.ys.drop(rows_to_drop, inplace=True)
-        self.ys.reset_index(drop=True, inplace=True)
+
+        # Drop columns from all datasets
+        self.y.drop(rows_to_drop, inplace=True)
+        # self.y.reset_index(drop=True, inplace=True)
+        # interrupt for short targets
+        if len(self.y) < 10:
+            return None, None, None
         self.df.drop(rows_to_drop, inplace=True)
-        self.df.reset_index(drop=True, inplace=True)
+        # self.df.reset_index(drop=True, inplace=True)
         self.veris_df.drop(rows_to_drop, inplace=True)
-        self.veris_df.reset_index(drop=True, inplace=True)
-        # Drop useless cols
-        cols_to_drop = list(set(ys.columns) - set(targets))
-        ys.drop(columns=cols_to_drop, inplace=True)
+        # self.veris_df.reset_index(drop=True, inplace=True)
         # only applies to assets
-        if "asset.variety.Kiosk/Term" in targets:
-            self.ys.rename(mapper={"asset.variety.Kiosk/Term": "asset.variety.Kiosk-Term"},
-                           axis="columns",
-                           inplace=True)
-        if "action.malware.variety.Backdoor" in targets and "action.malware.variety.C2" in targets:
-            self.ys["action.malware.variety.Backdoor or C2"] = \
-                self.ys.apply(lambda x: x["action.malware.variety.C2"] or x["action.malware.variety.Backdoor"], axis=1)
-            self.ys.drop(columns=["action.malware.variety.Backdoor", "action.malware.variety.C2"], inplace=True)
-        return self.ys, self.df, self.veris_df
+        return self.df, self.veris_df, self.y.astype(int)
+
+    # def process_target(self, ys, targets):
+    #     """ Default preprocessing and target selection method for multioutput target datasets"""
+    #     self.ys = ys
+    #     # locate rows to drop
+    #     if isinstance(targets, str):
+    #         targets = [targets]
+    #     rows_to_drop = np.ones(self.ys.shape[0]).astype(bool)
+    #     for target in targets:
+    #         # delete rows that have values diff than 0,1 for the targets of interest
+    #         local_rows_to_drop_1 = (self.ys[target] != 0).values
+    #         local_rows_to_drop_2 = (self.ys[target] != 1).values
+    #         local_rows_to_drop = np.bitwise_and(local_rows_to_drop_1, local_rows_to_drop_2)
+    #         rows_to_drop = np.bitwise_and(local_rows_to_drop, rows_to_drop)
+    #     rows_to_drop = np.where(rows_to_drop)[0].reshape(-1).tolist()
+    #     # Delete selected rows from all datasets
+    #     self.ys.drop(rows_to_drop, inplace=True)
+    #     self.ys.reset_index(drop=True, inplace=True)
+    #     self.df.drop(rows_to_drop, inplace=True)
+    #     self.df.reset_index(drop=True, inplace=True)
+    #     self.veris_df.drop(rows_to_drop, inplace=True)
+    #     self.veris_df.reset_index(drop=True, inplace=True)
+    #     # Drop useless cols
+    #     cols_to_drop = list(set(ys.columns) - set(targets))
+    #     ys.drop(columns=cols_to_drop, inplace=True)
+    #     # only applies to assets
+    #     if "asset.variety.Kiosk/Term" in targets:
+    #         self.ys.rename(mapper={"asset.variety.Kiosk/Term": "asset.variety.Kiosk-Term"},
+    #                        axis="columns",
+    #                        inplace=True)
+    #     if "action.malware.variety.Backdoor" in targets and "action.malware.variety.C2" in targets:
+    #         self.ys["action.malware.variety.Backdoor or C2"] = \
+    #             self.ys.apply(lambda x: x["action.malware.variety.C2"] or x["action.malware.variety.Backdoor"], axis=1)
+    #         self.ys.drop(columns=["action.malware.variety.Backdoor", "action.malware.variety.C2"], inplace=True)
+    #     return self.ys, self.df, self.veris_df
 
     def one_hot_encode_and_scale(self, predictors, ind_one_hot=True):
         # victim.orgsize
@@ -176,7 +180,6 @@ class preprocessor():
 
         # action.x.variety
         if "action.x.variety" in predictors:
-            lb = LabelBinarizer()
             for x in ["misuse", "physical", "error", "hacking", "social", "malware"]:
                 self.df = ColToOneHot(self.df, self.veris_df, father_col=f"action.{x}.variety", replace=True)
                 self.df.drop(columns=f"action.{x}.variety.Unknown", inplace=True)
@@ -189,13 +192,16 @@ class preprocessor():
             self.df = self.df.drop(columns=["asset.assets.variety.Unknown"])
         # victim.industry
         self.NAICS = None
-        self.industry_one_hot=None
+        self.industry_one_hot = None
         if "victim.industry" in predictors:
             if ind_one_hot:
                 self.NAICS = "You have requested one hot encoding so NAICS has no value"
                 lb = LabelBinarizer()
-                self.industry_one_hot = pd.DataFrame(data=lb.fit_transform(self.df["victim.industry"]),
-                                                columns=["victim.industry." + no for no in lb.classes_])
+                transformed_column = lb.fit_transform(self.df["victim.industry"])
+                self.industry_one_hot = \
+                    pd.DataFrame(data=transformed_column,
+                                 columns=["victim.industry." + no for no in lb.classes_],
+                                 index=self.df.index)
                 # drop dummy
                 self.industry_one_hot = self.industry_one_hot.iloc[:, :-1]
                 self.df.drop(columns=["victim.industry", "victim.industry.name"], inplace=True)
@@ -204,9 +210,7 @@ class preprocessor():
                 sc = StandardScaler()
                 self.NAICS = sc.fit_transform(df["victim.industry"].values.reshape(-1, 1))
                 self.df["victim.industry"] = NAICS
-        self.df = self.df.astype(int).reset_index(drop=True)
-        # if "victim.orgsize" not in predictors:
-        #     X.drop(columns=["victim.orgsize.Large"], inplace=True)
+        self.df = self.df.astype(int)
         return self.df, self.NAICS, self.industry_one_hot
 
 
@@ -235,53 +239,53 @@ def merge_low_frequency_columns (df,
     total_sum = frequencies.sum()
     # candidate columns to be merged due to few samples
     chosen_cols = frequencies[frequencies / total_sum < threshold].index.tolist()
-    # print(chosen_cols)
-    print(candidate_df[chosen_cols])
+    # print(candidate_df[chosen_cols])
     # just check if there is a 1 in the columns that need to be merged to a new one
     merge = lambda x: 0 if sum(x) == 0 else 1
     # print(candidate_df.columns)
-    print(candidate_df[chosen_cols])
+    # print(candidate_df[chosen_cols])
     if drop_merged:
         df_.drop(columns=chosen_cols, inplace=True)
     df_[merge_into] = candidate_df.apply(lambda x: merge(x[chosen_cols]), axis=1)
     return df_
 
-def create_log_folder(pipeline, results_type="Tuning", results_root=os.curdir):
-    now = datetime.datetime.now() + datetime.timedelta()
-    pipeline_dir = os.path.join(results_root, pipeline, str(now.strftime("%Y%m%d-%H%M%S")))
-    os.makedirs(pipeline_dir)
-    save_dir = os.path.join(pipeline_dir, results_type)
-    os.makedirs(save_dir)
-    return save_dir
+# def create_log_folder(pipeline, results_type="Tuning", results_root=os.curdir):
+#     now = datetime.datetime.now() + datetime.timedelta()
+#     pipeline_dir = os.path.join(results_root, pipeline, str(now.strftime("%Y%m%d-%H%M%S")))
+#     os.makedirs(pipeline_dir)
+#     save_dir = os.path.join(pipeline_dir, results_type)
+#     os.makedirs(save_dir)
+#     return save_dir
 
 def preprocessing(df, veris_df, 
-                  predictors , targets, 
-                  industry_one_hot, imputer):
+                  predictors , 
+                  target_name, 
+                  industry_one_hot, 
+                  imputer):
+    print("Preprocessing...\n")
     # Data preprocessing = Feature selection, Imputation, One Hots etc...
     ## Drop environmental and modify NAICS to 2 digits
     pp = preprocessor(df, veris_df)
     df, veris_df = pp.drop_environmental()
     df = pp.round_NAICS(digits=2)
 
+
     # Pipeline 2: Predict 1st level asset
     ## Feature selection
     dataset, veris_df = pp.add_predictors(predictors=predictors)
-
-    ###  Pipeline 2.1
-    #### Imputation method 1: Don't impute - just drop
-    dataset, veris_df = pp.imputer(method=imputer)
-
-    #### Define targets
-    ys = ColToOneHot(collapsed=dataset,
-                     veris_df=veris_df,
-                     father_col="asset.variety",
-                     replace=False)
-    ys, dataset, veris_df = pp.process_target(ys, targets=targets)
     
+    """Probably imputer should function together with process target-> 
+    Take care. process_target() and imputer(): should be revisited!!"""
+    dataset, veris_df, y = pp.fetch_target(target_name=target_name)
+    # print(len(y))
+    #### Imputation method 1: Don't impute - just drop
+    dataset, veris_df, y = pp.imputer(method=imputer)
+    # print(len(y))
+    # print(sum(y))
     #### One Hot Encoding and Scaling
     X, NAICS, industry_one_hot = \
         pp.one_hot_encode_and_scale(predictors=predictors,
                                     ind_one_hot=industry_one_hot)
-    return X, ys
+    # print(len(y))
 
-
+    return X, y

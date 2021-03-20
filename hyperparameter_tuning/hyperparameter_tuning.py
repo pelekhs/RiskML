@@ -5,20 +5,19 @@ import json
 import pprint
 from sklearn.metrics import roc_curve, precision_recall_curve, auc, make_scorer
 from preprocessing import create_log_folder
-from sklearn.svm import SVC
 import mlflow
 from globals import *
 from sklearn.metrics import recall_score, accuracy_score, \
     precision_score, f1_score, confusion_matrix, roc_auc_score
-from sklearn.model_selection import train_test_split
 from evaluation import grouped_evaluation
-from globals import *
 from preprocessing import preprocessing, load_datasets
+from utils import get_task
 
 # Default Arguments
 ## Preprocessing
-PREDICTORS = ['action', 'action.x.variety', 'victim.industry', 'victim.orgsize']
-TARGETS = ['asset.variety.Server', 'asset.variety.User Dev']#'asset.variety.Media',]
+#PREDICTORS = ['action', 'action.x.variety', 'victim.industry', 'victim.orgsize']
+#TARGETS = ['asset.variety.Server', 'asset.variety.User Dev']#'asset.variety.Media',]
+TASK_NAME = "asset.variety"
 INDUSTRY_ONE_HOT = True
 IMPUTER = 'dropnan'
 ## Tuning
@@ -55,22 +54,25 @@ def mlflow_gridsearch(X, y,
                        scoring=get_scorer(metric, average), 
                        refit=True,
                        n_jobs=n_jobs)
-    with mlflow.start_run(run_name='gridsearch', nested=True) as run:
+    with mlflow.start_run(run_name=f'gridsearch on {metric}', nested=True) as run:
         mlflow.set_tags({'estimator_family': estimator_dict['family_name'], 
                          'target': y.name,
                          'predictors': predictors, 
                          'tuning_metric': f'{metric}_{average}'})
         clf.fit(X, y)
+        clf.predict
+        print(clf.cv_results_)
+
     return clf
 
 def ML_tuner_CV(X, y,  
+                predictors,
+                metric, 
+                average,
                 models=MODELS, 
-                predictors=PREDICTORS,
-                metric=METRIC, 
-                average=AVERAGING,
-                n_jobs_cv=N_JOBS_CV, 
-                n_folds=N_FOLDS,
-                random_state=RANDOM_STATE): 
+                n_jobs_cv=-1, 
+                n_folds=5,
+                random_state=None): 
 
     """  ML classifier hyperparameter tuning """
     skf = StratifiedKFold(n_splits=n_folds, 
@@ -94,16 +96,19 @@ def ML_tuner_CV(X, y,
                                     n_jobs_cv, 
                                     random_state)
 
-def grouped_search(X, y, 
-                   metric=METRIC,
-                   average=AVERAGING,
-                   n_jobs_cv=N_JOBS_CV,
+def grouped_search(X, y,
+                   predictors, 
+                   metric,
+                   average,
+                   n_jobs_cv=-1,
                    models=MODELS,
-                   predictors=PREDICTORS,
-                   n_folds=N_FOLDS,
-                   random_state=RANDOM_STATE,
+                   n_folds=5,
+                   random_state=None,
                    experiment_id=None,
                    readme=True):
+    """ This function is a wrapper for gridsearch. It creates a loop for applying 
+        hyperparameter tuning on multiple independent targets and helps to store 
+        results a log inside a common mlflow experiment """  
     
     # Custom Logging
     if readme:
@@ -136,53 +141,55 @@ def grouped_search(X, y,
                              'tuning_metric': f'{metric}_{average}'})
             # Single target tuning
             ML_tuner_CV(X, y[target], 
+                        predictors=predictors, 
                         metric=metric,
                         average=average,
                         n_jobs_cv=n_jobs_cv,
                         models=models,
-                        predictors=predictors, 
                         n_folds=n_folds,
                         random_state=random_state)
 
 if __name__ == '__main__':
 
-    experiment_id = mlflow.set_experiment("skata")
+    # Parse arguments (replace with click() and run())
+    task_name = TASK_NAME
+    industry_one_hot = INDUSTRY_ONE_HOT
+    imputer =  IMPUTER
+    metric = METRIC
+    averaging = AVERAGING
+    n_jobs_cv = N_JOBS_CV
+    n_folds = N_FOLDS
+    random_state=RANDOM_STATE
+    readme = README
+
+    # Set experiment
+    experiment_id = mlflow.set_experiment(task_name)
+    print(experiment_id)
     #experiment_id = mlflow.set_experiment(TARGETS[0].split('.')[0])
     
     # Load data
     df, veris_df = load_datasets()
     
     # Manage task predictors and features
-    if task == "asset.variety":
-        predictors = ['action', 
-                      'action.x.variety', 
-                      'victim.industry', 
-                      'victim.orgsize']
-        targets = veris_df.filter(like="asset.variety.").columns.tolist()
-        targets.remove("asset.variety.Embedded", 
-                       "asset.variety.Unknown"
-                       "asset.variety.Network")
-    elif task == "asset.assets.variety":
-    elif task == "action":
-    elif task == "action.x.variety" 
+    predictors, targets = get_task(task_name, veris_df)
 
     # Preprocessing
     X, y = preprocessing(df, veris_df,
-                         PREDICTORS, 
-                         TARGETS, 
-                         INDUSTRY_ONE_HOT,
-                         IMPUTER)
+                         predictors, 
+                         targets, 
+                         industry_one_hot,
+                         imputer)
             
 
     ## Hyperparameter tuning for training separate classifiers for each 2nd level action
-    if METRIC in ['auc', 'accuracy', 'precision', 'recall', 'f1']:
+    if metric in ['auc', 'accuracy', 'precision', 'recall', 'f1']:
             grouped_search(X, y, 
-                           metric=METRIC,
-                           average=AVERAGING,
-                           n_jobs_cv=N_JOBS_CV,
-                           models=MODELS,
-                           predictors=PREDICTORS, 
-                           n_folds=N_FOLDS,
-                           random_state=RANDOM_STATE,
-                           readme=README,
+                           predictors=predictors, 
+                           metric=metric,
+                           average=averaging,
+                           n_jobs_cv=n_jobs_cv,
+                           models=MODELS, 
+                           n_folds=n_folds,
+                           random_state=random_state,
+                           readme=readme,
                            experiment_id=experiment_id)

@@ -12,7 +12,7 @@ entry_points:
   ML_asset:
     parameters:
       predictors: {type: string, default: ' '}
-      train_size: {type: float, default: 0.8}
+      train_size: {type: float, default: 1.0}
       random_state: {type: int, default: -1}
       metric: {type: string, default: 'f1'}
       metric_averaging: {type: string, default: 'macro'}
@@ -27,20 +27,34 @@ entry_points:
       tuning_metric: {type: string, default: 'f1'}
       tuning_averaging: {type: string, default: 'macro'}
     command: |
-        python3 ML_asset_l2.py --features {features} --stratify {stratify} --train-size {traini_size} --tuning-metric {tuning_metric} --tuning-averaging {tuning_averaging}
+        python3 ML_asset_l2.py --features {features} --stratify {stratify} --train-size {train_size} --tuning-metric {tuning_metric} --tuning-averaging {tuning_averaging}
 
-    gridsearch:
+  gridsearch:
     parameters:
-      training_data: {type: string, default: '../csv/'}
-      metric: {type: string, default: 'accuracy'}
-      algo: {type: string, default: "tpe.suggest"}
-      seed: {type: int, default: 97531}
-    command: "python -O search_hyperopt.py {training_data}
-                                                 --max-runs {max_runs}
-                                                 --epochs {epochs}
-                                                 --metric {metric}
-                                                 --algo {algo}
-                                                 --seed {seed}"
+      task: {type: string, default: 'action'}
+      metric: {type: string, default: 'auc'}
+      imputer: {type: string, default: 'dropnan'}
+      averaging: {type: string, default: 'macro'}
+      random_state: {type: int, default: 0}
+      train_size: {type: float, default: 1.0}
+      n_jobs_cv: {type: int, default: -1}
+      n_folds: {type: int, default: 5}
+    command: |
+      python3 hyperparameter_tuning/gridsearch.py --task {task} --train-size {train_size} --imputer {imputer} --n-jobs-cv {n_jobs_cv} --n-folds {n_folds} --metric {metric} --averaging {averaging}
+
+  train:
+    parameters:
+      task: {type: string, default: 'action'}
+      target: {type: string, default: ' '}
+      algo: {type: string, default: 'LR'}
+      hyperparams: {type: string, default: '{}'}
+      imputer: {type: string, default: 'dropnan'}
+      train_size: {type: float, default: 1}
+      split_random_state: {type: int, default: 0}
+      n_folds: {type: int, default: 5}
+    command: |
+      python3 train.py --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n_folds {n_folds} 
+  
   main:
     parameters:
       ml_asset_algorithm: {type: string, default: "RF"}
