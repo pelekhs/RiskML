@@ -3,6 +3,7 @@ import pandas as pd
 import os, sys
 from globals import CSV_DIR, JSON_DIR
 from verispy import VERIS
+from sklearn.model_selection import train_test_split
 
 v = VERIS(json_dir=JSON_DIR)
 
@@ -164,3 +165,39 @@ def fetch_logged_data(run_id):
         "tags": tags,
         "artifacts": artifacts,
     }
+
+def train_test_split_and_log(X, y, train_size, random_state):
+    # Train / Test split
+    if train_size < 1:
+        X_train, X_test, y_train, y_test = \
+                train_test_split(X, y, 
+                                train_size=train_size,
+                                test_size=1-train_size,
+                                shuffle=True,
+                                stratify=y, 
+                                random_state=random_state)
+    else:
+        X_train = X
+        y_train = y
+        X_test = "all data was used as training set"
+        y_test = "all data was used as training set"
+
+    # Log datasets
+    with open('X_train.csv', 'w', encoding='utf-8') as f:
+        X_train.to_csv(f)
+        mlflow.log_artifact('X_train.csv')
+        f.close()
+    with open('y_train.csv', 'w', encoding='utf-8') as f:
+        y_train.to_csv(f)
+        mlflow.log_artifact('y_train.csv')
+        f.close()
+    if isinstance(X_test, pd.DataFrame):
+        with open('X_test.csv', 'w', encoding='utf-8') as f:
+            X_test.to_csv(f)
+            mlflow.log_artifact('X_test.csv')
+            f.close()  
+        with open('y_test.csv', 'w', encoding='utf-8') as f:
+            y_test.to_csv(f)
+            mlflow.log_artifact('y_test.csv')
+            f.close() 
+    return X_train, X_test, y_train, y_test

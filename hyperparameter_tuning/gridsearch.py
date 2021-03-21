@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 parentdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parentdir)
 import globals
-from evaluation import grouped_evaluation, get_scorer
+from evaluation import get_scorer
 from preprocessing import preprocessing
 from utils import get_task, load_datasets, check_y_statistics
 
@@ -40,11 +40,11 @@ def mlflow_gridsearch(X, y,
                       n_jobs):
     # Define gridsearch and autolog with mlflow
     mlflow.sklearn.autolog()
-    print(y)
+    # print(get_scorer('all'))
     grs = GridSearchCV(estimator=estimator_dict['class'](),
                        param_grid=estimator_dict['parameter_grid'],
                        cv=n_folds, 
-                       scoring=get_scorer('all'), 
+                       scoring=get_scorer('gridsearch'), 
                        refit=metric,
                        n_jobs=n_jobs)
     # Start run and log

@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from sklearn.metrics import roc_curve, precision_recall_curve, auc, make_scorer
 from sklearn.metrics import recall_score, accuracy_score, \
     precision_score, f1_score, confusion_matrix, roc_auc_score
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.model_selection import StratifiedKFold
 
 # Hosmer Lemeshow
@@ -48,7 +48,9 @@ def logit_p(skm, x):
     x_full = np.matrix(np.insert(np.array(x), 0, 1, axis = 1))
     result = np.zeros((m, m))
     for i in range(n):
-        result = result + np.dot(np.trafrom sklearn.model_selection import StratifiedKFoldlt))
+        result = result + np.dot(np.transpose(x_full[i, :]), 
+                                 x_full[i, :]) * pb[i,1] * pb[i, 0]
+    vcov = np.linalg.inv(np.matrix(result))
     se = np.sqrt(np.diag(vcov))
     t =  coefs/se  
     pval = (1 - norm.cdf(abs(t))) * 2
@@ -65,26 +67,50 @@ def get_scorer(metric=None, average='macro'):
         'accuracy': make_scorer(accuracy_score),
         'f1': make_scorer(f1_score, average=average),
         'auc': make_scorer(roc_auc_score, average=average),
-        'hl': make_scorer(hl_test, greater_is_better=False, needs_proba=True)
+        #'hl': make_scorer(hl_test, greater_is_better=False, needs_proba=True)
     }
     if metric in ['precision', 'recall', 'accuracy', 'f1', 'auc', 'hl']:
         return scorers[metric]
     elif metric=='all':
+        metrics = ['precision', 'recall', 'f1', 'auc']
+        averaging = ['macro', 'micro', 'weighted']
+        
+        scorer_names = ['-'.join([m, a]) for m in metrics for a in averaging]
+        scorers = [get_scorer(m, a) for m in metrics for a in averaging] 
+        scoring = dict(zip(scorer_names, scorers))
+        
+        scoring['accuracy'] = get_scorer('accuracy')
+        # scoring['hl'] =  get_scorer('hl')
+        return scoring
+    elif metric=='gridsearch':
+        # return all metrix with the specific averaging type
         return scorers
     else:
         print("Error: Please correctly define metric. Cannot get scorer!")
 
-def evaluate(y_test, y_pred, y_pred_proba, n_folds):
-    cv = StratifiedKFold(n_splits=n_folds)
+
+
+def evaluate_cv(estimator, X, y, n_folds=5, random_state=None):
+    
     print("Evaluating...\n")
-    for metric in ['precision', 'recall', 'f1', 'auc']:
-        for average in ['macro', 'micro', 'weighted'];
-            metrix_dict[metric+average] = \
-                cross_val_score(estimator, X, y, 
-                                get_scorer(metric=metric, average=average), 
-                                cv=cv)
-    metrix_dict["accuracy"] = cross_val_score(estimator, X, y, "accuracy", cv=cv)
-    metrix_dict["hl_test"] = 0
+    
+    # Get dictionary of scorers
+    scoring = get_scorer(metric='all')
+    
+    # Define CV
+    skf = StratifiedKFold(n_splits=n_folds, 
+                          shuffle=True if isinstance(random_state, int) else False, 
+                          random_state=random_state)
+    # Cross validate
+    cv_results = cross_validate(estimator=estimator, 
+                                X=X, 
+                                y=y, 
+                                scoring=scoring, 
+                                cv=skf)
+
+    # Get mean of folds performance
+    metrix_dict = {k: np.mean(v) for k, v in cv_results.items()}
+
     return metrix_dict
 
 

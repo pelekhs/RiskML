@@ -1,7 +1,7 @@
 {
     "Collapsed features": [
-        "asset.variety",
-        "asset.assets.variety",
+        "action",
+        "action.x.variety",
         "victim.industry",
         "victim.orgsize"
     ]

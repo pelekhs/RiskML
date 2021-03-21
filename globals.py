@@ -18,7 +18,7 @@ from sklearn.naive_bayes import GaussianNB, CategoricalNB
 MODELS = [
     {'class': SVC,
      'family_name': 'SVM',
-     'parameter_grid': {'C': [1, 10, 100], 'kernel': ['rbf', 'linear']}},
+     'parameter_grid': {'C': [1, 10, 100], 'kernel': ['rbf', 'linear'], 'predict_proba':[True]}},
     {'class': KNeighborsClassifier,
      'family_name': 'KNN',
      'parameter_grid': {'metric': ['minkowski', 'hamming'],

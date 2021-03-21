@@ -1,17 +1,16 @@
-from mlflow import log_metric, log_param, log_artifacts
 import click
 import json
 import mlflow
+from mlflow.models.signature import infer_signature
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import recall_score, accuracy_score
+import pprint
 
 import globals
-from evaluation import evaluate
+from evaluation import evaluate_cv
 from preprocessing import preprocessing
-from utils import get_task, load_datasets, check_y_statistics
-import pprint
+from utils import get_task, load_datasets, check_y_statistics, train_test_split_and_log
 
 
 # Default values
@@ -27,54 +26,37 @@ default_arguments = {
     'n_folds': 5
 }
 
-def train(X, y, estimator, hyperparams, train_size, n_folds, split_random_state):
-    print("Training & evaluation...\n")
-    # Train / Test split
-    if train_size < 1:
-        X_train, X_test, y_train, y_test = \
-                train_test_split(X, y, 
-                                train_size=train_size,
-                                test_size=1-train_size,
-                                shuffle=True,
-                                stratify=y, 
-                                random_state=split_random_state)
-    else:
-        X_train = X
-        y_train = y
-
-    # Log datasets
-    with open('X_train.csv', 'w', encoding='utf-8') as f:
-        X_train.to_csv(f)
-        mlflow.log_artifact('X_train.csv')
-        f.close()
-    with open('y_train.csv', 'w', encoding='utf-8') as f:
-        y_train.to_csv(f)
-        mlflow.log_artifact('y_train.csv')
-        f.close()
-    if isinstance(X_test, pd.DataFrame):
-        with open('X_test.csv', 'w', encoding='utf-8') as f:
-            X_test.to_csv(f)
-            mlflow.log_artifact('X_test.csv')
-            f.close()  
-        with open('y_test.csv', 'w', encoding='utf-8') as f:
-            y_test.to_csv(f)
-            mlflow.log_artifact('y_test.csv')
-            f.close()  
-
-    # # Fit estimator
-    # estimator.fit(X_train, y_train)
+def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_random_state=None):
     
-    # # Predict target
-    # y_pred = estimator.predict(X_test)
-    # y_pred_proba = estimator.predict_proba(X_test)
-    # print(y_pred_proba)
+    print("Splitting dataset...\n")
+    X_train, X_test, y_train, y_test = \
+        train_test_split_and_log(X, y, train_size, split_random_state)
 
+    print("Training & evaluation...\n")
+
+    # evaluation for train_size = 1
+    if train_size == 1:
+        metrix_dict = evaluate_cv(estimator, X, y, n_folds, split_random_state)
+        mlflow.log_metrics(metrix_dict)
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(metrix_dict)
+
+        # Refit model to whole dataset and log
+        model = estimator.fit(X, y)
+        signature = infer_signature(X, model.predict_proba(X.iloc[0:2]))
+        mlflow.sklearn.log_model(sk_model=model, 
+                                 artifact_path="model",
+                                 signature=signature)
+    # /* To be implemented for simple train/test scoring (train_size < 1)*/
+    # else:
+        # estimator.fit(X_train, y_train)
+        # y_pred = estimator.predict(X_test)
+        # y_pred_proba = estimator.predict_proba(X_test)
+        # metrix_dict = evaluate(y_test, y_pred, y_pred_prob)
+    
     # Log estimator params
     mlflow.log_params(estimator.get_params())
-
-    # Evaluate for ALL METRICS and LOG!!!
-    metrix_dict = evaluate(estimator, X, y)
-    mlflow.log_metrics(metrix_dict)
+    return
 
 @click.command()
 @click.option("--task", "-t", 
@@ -130,7 +112,7 @@ def train(X, y, estimator, hyperparams, train_size, n_folds, split_random_state)
 @click.option("--split-random-state", "-rs",
               type=int, 
               default=default_arguments['split_random_state'],
-              help="Random state for splitting train / test"
+              help="Random state for splitting train / test or cv"
               )
 @click.option("--n-folds", "-f", 
               type=int,
@@ -138,7 +120,7 @@ def train(X, y, estimator, hyperparams, train_size, n_folds, split_random_state)
               help="Number of folds for CV if there training set is all dataset"
               )
 
-def run(task, target, algo, hyperparams, imputer, train_size, split_random_state):
+def run(task, target, algo, hyperparams, imputer, train_size, split_random_state, n_folds):
 
     # Process arguments
     hyperparams = json.loads(hyperparams)
@@ -167,8 +149,9 @@ def run(task, target, algo, hyperparams, imputer, train_size, split_random_state
 
     # Start training workflow and logs
     print(f'\nTraining for: {target}...\n')
+
     with mlflow.start_run(run_name=target):
- 
+
         # Preprocessing
         X, y = preprocessing(df, veris_df,
                              predictors, 
@@ -184,7 +167,7 @@ def run(task, target, algo, hyperparams, imputer, train_size, split_random_state
                          'imputer': imputer})
 
         # Train
-        train(X, y, estimator, hyperparams, train_size, n_folds, split_random_state)
+        train_evaluate(X, y, estimator, hyperparams, train_size, n_folds, split_random_state)
 
 if __name__ == '__main__':
     run()
