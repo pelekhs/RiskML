@@ -7,14 +7,17 @@ import mlflow
 import click
 import numpy as np
 from sklearn.model_selection import train_test_split
+from dotenv import load_dotenv
 
 # please change in application -> run globals in the beginning and learn how to import from parent folder!!!!
 parentdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parentdir)
-import globals
+import models
+
 from evaluation import get_scorer
 from preprocessing import preprocessing
 from utils import get_task, load_datasets, check_y_statistics
+from utils import train_test_split_and_log
 
 # Default values
 
@@ -28,7 +31,7 @@ default_arguments = {
     'random_state': 0,
     'train_size': 0.8,
     'industry_one_hot': True,
-    'models': globals.MODELS
+    'models': models.models
 }
 
 def mlflow_gridsearch(X, y, 
@@ -110,7 +113,7 @@ def ML_tuner_CV(X, y,
               help="Imputation strategy"
               )
 @click.option("--metric", "-m", 
-              type=click.Choice(['auc', 'accuracy', 'precision', 'recall', 'f1']),
+              type=click.Choice(['auc', 'accuracy', 'precision', 'recall', 'f1', 'hl']),
               default=default_arguments['metric'], 
               help="Metric to maximise during tuning."
               )
@@ -156,83 +159,56 @@ def run(task, metric, averaging, imputer, n_folds, n_jobs_cv, random_state, trai
         json.dump(collapsed_features, f, indent=4)
     with open('targets.txt', 'w') as f:
         json.dump(subtasks, f, indent=4)
+    
+    metric_id = ("-".join[metric, averaging]) if (metric not in ['hl', 'accuracy']) else metric
+    for target in targets:
+        print(f'\n************************\n{target}\n************************')
+        with mlflow.start_run(run_name=f'{target} | {metric}-{averaging}'):
+            # Preprocessing
+            X, y = preprocessing(df, veris_df,
+                                    predictors, 
+                                    target, 
+                                    default_arguments['industry_one_hot'],
+                                    imputer)
+            # Log tags and params
+            mlflow.set_tag("mlflow.runName", f'{target} | {metric}-{averaging}')
+            mlflow.log_artifact('simple_feature_set.txt', 
+                                artifact_path='features')
+            mlflow.log_artifact('targets.txt', 
+                                artifact_path='targets')
 
-    if metric in ['auc', 'accuracy', 'precision', 'recall', 'f1']:
-        for target in targets:
-            print(f'\n************************\n{target}\n************************')
-            with mlflow.start_run(run_name=f'{target} | {metric}-{averaging}'):
-                # Preprocessing
-                X, y = preprocessing(df, veris_df,
-                                     predictors, 
-                                     target, 
-                                     default_arguments['industry_one_hot'],
-                                     imputer)
-                # Log tags and params
-                mlflow.set_tag("mlflow.runName", f'{target} | {metric}-{averaging}')
-                mlflow.log_artifact('simple_feature_set.txt', 
-                                    artifact_path='features')
-                mlflow.log_artifact('targets.txt', 
-                                    artifact_path='targets')
-                mlflow.set_tags({'target': target, 
-                                 'predictors': predictors,
-                                 'n_samples': len(y),
-                                 'tuning_metric': f'{metric}-{averaging}',
-                                 'imputer': imputer,
-                                 'n_folds': n_folds,
-                                 'random_state': random_state})
-                mlflow.log_params({'tuning_metric': f'{metric}-{averaging}',
-                                   'imputer': imputer,
-                                   'n_folds': n_folds,
-                                   'random_state': random_state})
-                # check y statistics and log
-                mlflow_tags = check_y_statistics(y)
-                mlflow.set_tags(mlflow_tags)
+            mlflow.set_tags({'target': target, 
+                                'predictors': predictors,
+                                'n_samples': len(y),
+                                'class_balance': sum(y)/len(y),
+                                'tuning_metric': metric_id,
+                                'imputer': imputer,
+                                'n_folds': n_folds,
+                                'random_state': random_state})
+            mlflow.log_params({'tuning_metric': metric_id,
+                                'imputer': imputer,
+                                'n_folds': n_folds,
+                                'random_state': random_state})
+            # check y statistics and log
+            mlflow_tags = check_y_statistics(y)
+            mlflow.set_tags(mlflow_tags)
 
-                # skip loop if y is small
-                if mlflow_tags['error_class'] != '-':
-                    continue
-                # train / test if train percentage < 1
-                if not np.allclose(train_size, 1):
-                    X_train, X_test, y_train, y_test = \
-                            train_test_split(X, y, 
-                                            train_size=train_size,
-                                            test_size=1-train_size,
-                                            shuffle=True,
-                                            stratify=y, 
-                                            random_state=random_state)
-                else:
-                    X_train = X
-                    y_train = y
-                    X_test = "all data was used as training set"
-                    y_test = "all data was used as training set"
-                # Log datasets
-                with open('X_train.csv', 'w', encoding='utf-8') as f:
-                    X_train.to_csv(f)
-                    mlflow.log_artifact('X_train.csv')
-                    f.close()
-                with open('y_train.csv', 'w', encoding='utf-8') as f:
-                    y_train.to_csv(f)
-                    mlflow.log_artifact('y_train.csv')
-                    f.close()
-                if isinstance(X_test, pd.DataFrame):
-                    with open('X_test.csv', 'w', encoding='utf-8') as f:
-                        X_test.to_csv(f)
-                        mlflow.log_artifact('X_test.csv')
-                        f.close()  
-                    with open('y_test.csv', 'w', encoding='utf-8') as f:
-                        y_test.to_csv(f)
-                        mlflow.log_artifact('y_test.csv')
-                        f.close()  
-                # Single target tuning only on train data.
-                ML_tuner_CV(X_train, y_train, 
-                            predictors=predictors, 
-                            metric=metric,
-                            averaging=averaging,
-                            n_jobs_cv=n_jobs_cv,
-                            models=default_arguments['models'],
-                            n_folds=n_folds)
-    else:
-        print("Wrong tuning parameter")
+            # skip loop if y is small
+            if mlflow_tags['error_class'] != '-':
+                continue
+
+            # train / test if train percentage < 1
+            X_train, X_test, y_train, y_test = \
+                train_test_split_and_log(X, y, train_size, random_state)
+
+            # Single target tuning only on train data.
+            ML_tuner_CV(X_train, y_train, 
+                        predictors=predictors, 
+                        metric=metric,
+                        averaging=averaging,
+                        n_jobs_cv=n_jobs_cv,
+                        models=default_arguments['models'],
+                        n_folds=n_folds)
 
 if __name__ == '__main__':
     run()
