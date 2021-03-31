@@ -1,5 +1,6 @@
 from sklearn import metrics
 import numpy as np
+import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support as classmetrics
 from collections.abc import Iterable
 from sklearn.metrics import roc_curve, precision_recall_curve, auc, make_scorer
@@ -7,30 +8,43 @@ from sklearn.metrics import recall_score, accuracy_score, \
     precision_score, f1_score, confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.model_selection import StratifiedKFold
+from scipy.stats import chi2, norm
+
 
 # Hosmer Lemeshow
 # See https://jbhender.github.io/Stats506/F18/GP/Group13.html
-def hl_test(y_pred, y_true, g):
+def hl_test(y_true, y_pred, g=10, threshold=0.5):
     '''
     Hosmer-Lemeshow test to judge the goodness of fit for binary data
     Input: dataframe(data), integer(num of subgroups divided)
     Output: float
     '''
-    y_pred_st = y_pred.sort_values('prob')
-    y_pred_st['dcl'] = pd.qcut(y_pred_st['prob'], g)
+    data = pd.DataFrame()
+    data['true'] = y_true
+    data['prob'] = y_pred
+
+    data.loc[data['true'] > threshold, 'true'] = 1
+    data.loc[data['true'] <= threshold, 'true'] = 0
+
+    data_st = data.sort_values('prob')
     
-    ys = y_pred_st['ViolentCrimesPerPop'].groupby(y_pred_st.dcl).sum()
-    yt = y_pred_st['ViolentCrimesPerPop'].groupby(y_pred_st.dcl).count()
+    try:
+        data_st['dcl'] = pd.qcut(data_st['prob'], g)
+    except ValueError:
+        return 1
+    
+    ys = data_st['true'].groupby(data_st.dcl).sum()
+    yt = data_st['true'].groupby(data_st.dcl).count()
     yn = yt - ys
     
-    yps = y_pred_st['prob'].groupby(y_pred_st.dcl).sum()
-    ypt = y_pred_st['prob'].groupby(y_pred_st.dcl).count()
+    yps = data_st['prob'].groupby(data_st.dcl).sum()
+    ypt = data_st['prob'].groupby(data_st.dcl).count()
     ypn = ypt - yps
     
     hltest = ( ((ys - yps)**2 / yps) + ((yn - ypn)**2 / ypn) ).sum()
     pval = 1 - chi2.cdf(hltest, g-2)
-    
-    return(pval)
+
+    return pval
 
 def logit_p(skm, x):
     '''
@@ -67,7 +81,7 @@ def get_scorer(metric=None, average='macro'):
         'accuracy': make_scorer(accuracy_score),
         'f1': make_scorer(f1_score, average=average),
         'auc': make_scorer(roc_auc_score, average=average),
-        #'hl': make_scorer(hl_test, greater_is_better=False, needs_proba=True)
+        'hl': make_scorer(hl_test, needs_proba=True)
     }
     if metric in ['precision', 'recall', 'accuracy', 'f1', 'auc', 'hl']:
         return scorers[metric]
@@ -80,7 +94,7 @@ def get_scorer(metric=None, average='macro'):
         scoring = dict(zip(scorer_names, scorers))
         
         scoring['accuracy'] = get_scorer('accuracy')
-        # scoring['hl'] =  get_scorer('hl')
+        scoring['hl'] =  get_scorer('hl')
         return scoring
     elif metric=='gridsearch':
         # return all metrix with the specific averaging type
@@ -88,11 +102,7 @@ def get_scorer(metric=None, average='macro'):
     else:
         print("Error: Please correctly define metric. Cannot get scorer!")
 
-
-
 def evaluate_cv(estimator, X, y, n_folds=5, random_state=None):
-    
-    print("Evaluating...\n")
     
     # Get dictionary of scorers
     scoring = get_scorer(metric='all')
@@ -112,61 +122,3 @@ def evaluate_cv(estimator, X, y, n_folds=5, random_state=None):
     metrix_dict = {k: np.mean(v) for k, v in cv_results.items()}
 
     return metrix_dict
-
-
-# def grouped_evaluation(X_train, X_test, y_trains, y_tests, models,
-#                        evaluation_metric="f1", average='macro'):
-#     print("\nEvaluation")
-#     scores = {}
-#     for target in y_trains.columns:
-#         print("\n************************ {} ************************".format(target))
-#         scores[target] = base_evaluator(X_train,
-#                                         y_trains[target],
-#                                         X_test,
-#                                         y_tests[target],
-#                                         metric=evaluation_metric,
-#                                         average=average,
-#                                         models=models)
-#     return scores
-
-# # Create scores dictionary for each algorithm
-# def base_evaluator(X_train, y_train, X_test, y_test, models, metric="f1", average='macro'):
-#     mdl=[]
-#     results=[]
-#     for model in models.keys():
-#         print(f"Model: {model}")
-#         est = models[model]
-#         est.fit(X_train,  y_train)
-#         mdl.append(model)
-#         y_pred = est.predict(X_test)
-#         # will also need probabilistic predictions to evaluate!
-#         y_pred_prob = est.predict_proba(X_test)
-#         results.append((est.score(X_test, y_test), y_pred))
-#         print(metrics.classification_report(y_test, y_pred, digits=3))
-#     results = [dict(zip(['Accuracy','y_pred'], i)) for i in results]
-
-#     # At this point "scores" only contains accuracy and y_pred for each one of the best models chosen for each algorithm
-#     scores = dict(zip(mdl, results))
-
-#     # Enrich scores dictionary with the extra metrics
-#     min_metric_class={}
-#     max_metric_class={}
-#     print("Evaluation Summary:")
-#     for alg in scores.keys():
-#         print ("\n", alg)
-#         precision, recall, fscore, support = classmetrics(y_test, scores[alg]['y_pred'], average=average)
-#         scores[alg]['precision'] = precision
-#         scores[alg]['recall'] = recall
-#         scores[alg]['f1'] = fscore
-#         scores[alg]['support']  = support
-#         print(metric)
-#         print(alg)
-#         print(f"{metric}-{average}  : {scores[alg][metric]}")
-#         min_metric_class[alg] = np.argmin(scores[alg][metric])
-#         max_metric_class[alg] = np.argmax(scores[alg][metric])
-#     if isinstance(scores[alg][metric], Iterable) and len(scores[alg][metric]) > 1: # case of non-averaged metrics
-#         print(f"\nWorst performance class for each classifier based on {metric}:")
-#         print(min_metric_class)
-#         print(f"Best performance class for each classifier based on {metric}:")
-#         print(max_metric_class)
-#     return scores
