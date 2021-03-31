@@ -1,3 +1,9 @@
+# Install Packages
+# -----
+# install.packages("devtools")
+# devtools::install_github("vz-risk/verisr")
+# devtools::install_github("onlyphantom/verisr2")
+
 library(verisr)
 library(verisr2)
 
