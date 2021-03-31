@@ -81,7 +81,7 @@ def get_scorer(metric=None, average='macro'):
         'accuracy': make_scorer(accuracy_score),
         'f1': make_scorer(f1_score, average=average),
         'auc': make_scorer(roc_auc_score, average=average),
-        'hl': make_scorer(hl_test, needs_proba=True)
+        'hl': make_scorer(hl_test, needs_proba=True, greater_is_better=False)
     }
     if metric in ['precision', 'recall', 'accuracy', 'f1', 'auc', 'hl']:
         return scorers[metric]
