@@ -6,15 +6,15 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import recall_score, accuracy_score
 import pprint
+import os
 
-import globals
+import models
 from evaluation import evaluate_cv
 from preprocessing import preprocessing
 from utils import get_task, load_datasets, check_y_statistics, train_test_split_and_log
 
 
 # Default values
-
 default_arguments = {
     'task': 'asset.variety',
     'target': ' ',
@@ -31,7 +31,7 @@ def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_
     print("Splitting dataset...\n")
     X_train, X_test, y_train, y_test = \
         train_test_split_and_log(X, y, train_size, split_random_state)
-
+    
     print("Training & evaluation...\n")
 
     # evaluation for train_size = 1
@@ -47,6 +47,9 @@ def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_
         mlflow.sklearn.log_model(sk_model=model, 
                                  artifact_path="model",
                                  signature=signature)
+    else:
+        print ("Not ready to handle test set! Exitting...")
+        exit()
     # /* To be implemented for simple train/test scoring (train_size < 1)*/
     # else:
         # estimator.fit(X_train, y_train)
@@ -61,7 +64,8 @@ def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_
 @click.command()
 @click.option("--task", "-t", 
               type=click.Choice(
-                  ['asset.variety',
+                  ['attribute',
+                   'asset.variety',
                    'asset.assets.variety.S',
                    'asset.assets.variety.M',
                    'asset.assets.variety.U',
@@ -80,7 +84,7 @@ def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_
 @click.option("--target", "-tt", 
               type=str,
               default=default_arguments['target'],
-              help="Specific target variable"
+              help="Specific target variable. Omit this option to get list of options according to task"
               )
 @click.option("--algo", "-a", 
               type=click.Choice(
@@ -107,7 +111,7 @@ def train_evaluate(X, y, estimator, hyperparams, train_size=1, n_folds=5, split_
 @click.option("--train-size", "-ts", 
               type=float, 
               default=default_arguments['train_size'],
-              help="training set size"
+              help="Training set size"
               )
 @click.option("--split-random-state", "-rs",
               type=int, 
@@ -124,10 +128,11 @@ def run(task, target, algo, hyperparams, imputer, train_size, split_random_state
 
     # Process arguments
     hyperparams = json.loads(hyperparams)
+    
     # activate probability for svm
     if algo == 'SVM':
         hyperparams['probability'] = True 
-    estimator = [i for i in globals.MODELS 
+    estimator = [i for i in models.models
                  if i['family_name']==algo][0]['class'](**hyperparams)
     
     # Load data
@@ -142,10 +147,10 @@ def run(task, target, algo, hyperparams, imputer, train_size, split_random_state
         choices = dict(zip(range(len(targets)), targets))
         printer = pp.pprint(choices)
         target = choices[int(input(f"Select a target from the list above...\n{printer}\n"))]
-    
+    else:
     # Form target name
-    target = " - ".join([task, target]) if task.startswith('asset.assets.variety') else \
-            ".".join([task, target])
+        target = " - ".join([task, target]) if task.startswith('asset.assets.variety') \
+                                            else ".".join([task, target])
 
     # Start training workflow and logs
     print(f'\nTraining for: {target}...\n')
@@ -164,6 +169,7 @@ def run(task, target, algo, hyperparams, imputer, train_size, split_random_state
         mlflow.set_tags({'target': target, 
                          'predictors': predictors, 
                          'n_samples': len(y),
+                         'class_balance': sum(y)/len(y),
                          'imputer': imputer})
 
         # Train
