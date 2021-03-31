@@ -44,7 +44,7 @@ entry_points:
 
   train:
     parameters:
-      task: {type: string, default: 'action'}
+      task: {type: string, default: 'asset.variety'}
       target: {type: string, default: ' '}
       algo: {type: string, default: 'LR'}
       hyperparams: {type: string, default: '{}'}
