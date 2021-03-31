@@ -1,51 +1,37 @@
 import os
 import pandas as pd
 from verispy import VERIS
-from create_csv import create_veris_csv
 import argparse
 import numpy as np
-import globals
+from dotenv import load_dotenv
+from utils import create_veris_csv
 
-# from create_csv import create_veris_csv
-COLUMNS_TO_DROP_BY_TERM = ["cve",
-                           "asset.cloud",
-                           "notes",
-                           "incident_id",
-                           "plus"]
-
-COLUMNS_TO_DROP = ["actor.partner.country",
-                   "actor.external.country",
-                   "action.unknown.result",
-                   "asset.hosting",
-                   "attribute.confidentiality.state",
-                   "campaign_id",
-                   "victim.revenue.iso_currency_code",
-                   "victim.secondary.amount",
-                   "victim.secondary.amount"]
-
-COLUMNS_TO_MANAGE_TIME = ["attribute.availability.duration",
-                          "timeline.compromise",
-                          "timeline.discovery"]
-
-RECREATE_VERIS = False
-
-NEW_NAN = "NA"
-
-NEW_UNKNOWN_VALUE = "?"
+# Import environment variables
+load_dotenv() 
+JSON_DIR = os.environ.get('JSON_DIR')
+CSV_DIR = os.environ.get('CSV_DIR')
+COLUMNS_TO_DROP_BY_TERM = os.environ.get('COLUMNS_TO_DROP_BY_TERM').split(", ")
+COLUMNS_TO_DROP  = os.environ.get('COLUMNS_TO_DROP').split(", ")
+COLUMNS_TO_MANAGE_TIME  = os.environ.get('COLUMNS_TO_MANAGE_TIME').split(", ")
+RECREATE_VERIS = True if os.environ.get('RECREATE_VERIS') == 'True' else False
+NEW_NAN  = os.environ.get('NEW_NAN')
+NEW_UNKNOWN_VALUE  = os.environ.get('NEW_UNKNOWN_VALUE')
+RCOLLAPSED = os.environ.get('R_COLLAPSED_CSV_NAME')
+VERIS_DF = os.environ.get('BOOLEAN_CSV_NAME')
 
 
 def parse_arguments ():
     parser = argparse.ArgumentParser(
         description="Risk assessment preprocessor"
     )
-    # parser.add_argument("-j",
-    #                     "--json_dir",
-    #                     help="the directory containing the json files",
-    #                     default=JSON_DIR)
-    # parser.add_argument("-c",
-    #                     "--csv_dir",
-    #                     help="the directory containing the csv files",
-    #                     default=CSV_DIR)
+    parser.add_argument("-j",
+                        "--json_dir",
+                        help="the directory containing the json files",
+                        default=JSON_DIR)
+    parser.add_argument("-c",
+                        "--csv_dir",
+                        help="the directory containing the csv files",
+                        default=CSV_DIR)
     parser.add_argument("-dt",
                         "--columns_to_drop_by_term",
                         nargs='+',
@@ -211,17 +197,16 @@ if __name__ == "__main__":
     args = parse_arguments()
     # LOAD csv datasets from csv_dir
     if args.recreate_veris:
-        create_veris_csv(args.json_dir, args.csv_dir, "veris_df.csv")
-    v = VERIS(json_dir=args.json_dir)
+        create_veris_csv(args.json_dir, args.csv_dir, VERIS_DF)
 
-    collapsed = pd.read_csv(os.path.join(args.csv_dir, "Rcollapsed.csv"),
+    collapsed = pd.read_csv(os.path.join(args.csv_dir, RCOLLAPSED),
                             sep=",",
                             encoding='utf-8',
                             index_col=0,
                             low_memory=False) \
                   .reset_index(drop=True)
 
-    veris_df = pd.read_csv(os.path.join(args.csv_dir, "veris_df.csv"),
+    veris_df = pd.read_csv(os.path.join(args.csv_dir, VERIS_DF),
                            index_col=0,
                            low_memory=False)
 
