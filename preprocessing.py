@@ -220,16 +220,33 @@ def merge_low_frequency_columns (df,
                                  merge_into="action.hacking.variety.Other",
                                  drop_merged=True):
     """
+    
     This function calculates the number of trues (if columns is boolean) or ones (if column is int) in each candidate
     column of the dataframe, calculates the ratio with the total of true values for all candidate columns
     and if this ratio is smaller than the threshold it merges all of these columns into a new column that is defined
     by the "merge_into" argument. Arguments:
-
-    df: dataframe whose boolean or int columns need to be merged based on their total cardinality
-    column_regex_filter: regex expression to set the candidate columns of the dataframe (columns need to be int or bool)
-    threshold: the value of the ratio of column_sum/total_sum below which a column is chosen for merging
-    merge_into: the name of the column to hold the merge results
-    drop: if True drop the merged columns
+    
+    Parameters
+    ---------- 
+    df: DataFrame 
+        Dataframe whose boolean or int columns need to be merged based on their total cardinality
+    
+    column_regex_filter: str 
+        regex expression to set the candidate columns of the dataframe (columns need to be int or bool)
+    
+    threshold: float 
+        The value of the ratio of column_sum/total_sum below which a column is chosen for merging
+    
+    merge_into: str
+        The name of the column to hold the merge results
+    
+    drop: boolean
+        If True drop the merged columns
+    
+    Returns
+    ---------- 
+    DataFrame
+        The transformed DataFrame
     """
     # subset df based on required cols
     df_ =df.copy()
