@@ -1,9 +1,0 @@
-{
-    "Subtasks": [
-        "asset.variety.Kiosk/Term",
-        "asset.variety.Media",
-        "asset.variety.Person",
-        "asset.variety.Server",
-        "asset.variety.User Dev"
-    ]
-}
