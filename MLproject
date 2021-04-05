@@ -52,6 +52,7 @@ entry_points:
       train_size: {type: float, default: 1}
       split_random_state: {type: int, default: 0}
       n_folds: {type: int, default: 5}
+      etl: {type: str, default: 0}
     command: |
       python3 train.py --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n-folds {n_folds} 
   
