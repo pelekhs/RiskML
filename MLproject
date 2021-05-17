@@ -1,6 +1,11 @@
-name: Thesis
+name: thesis
 
 conda_env: conda.yml
+
+# docker_env:
+#   image: mlflow-docker-example-environment
+#   volumes: ["/local/path:/container/mount/path"]
+#   environment: [["NEW_ENV_VAR", "new_var_value"], "VAR_TO_COPY_FROM_HOST_ENVIRONMENT"]
     
 entry_points:
 
@@ -40,21 +45,22 @@ entry_points:
       n_jobs_cv: {type: int, default: -1}
       n_folds: {type: int, default: 5}
     command: |
-      python3 hyperparameter_tuning/gridsearch.py --task {task} --train-size {train_size} --imputer {imputer} --n-jobs-cv {n_jobs_cv} --n-folds {n_folds} --metric {metric} --averaging {averaging}
+      python3 hyperparameter_tuning/gridsearch.py --task {task} --train-size {train_size} --imputer {imputer} --n-jobs-cv {n_jobs_cv} --n-folds {n_folds} --metric {metric} --averaging {averaging} 
 
   train:
     parameters:
       task: {type: string, default: 'asset.variety'}
       target: {type: string, default: ' '}
-      algo: {type: string, default: 'LR'}
+      algo: {type: string, default: 'LGBM'}
       hyperparams: {type: string, default: '{}'}
       imputer: {type: string, default: 'dropnan'}
       train_size: {type: float, default: 1}
       split_random_state: {type: int, default: 0}
-      n_folds: {type: int, default: 5}
-      etl: {type: str, default: 0}
+      n_folds: {type: int, default: 0}
+      merge: {type: int, default: 1}
+      pca: {type: int, default: 0}
     command: |
-      python3 train.py --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n-folds {n_folds} 
+      python3 train.py --pca {pca} --merge {merge} --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n-folds {n_folds}
   
   main:
     parameters:

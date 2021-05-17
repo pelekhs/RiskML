@@ -9,7 +9,11 @@ from sklearn.metrics import recall_score, accuracy_score, \
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.model_selection import StratifiedKFold
 from scipy.stats import chi2, norm
+import logging
 
+# Configure logging
+format = "%(asctime)s: %(message)s"
+logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
 # Hosmer Lemeshow
 # See https://jbhender.github.io/Stats506/F18/GP/Group13.html
@@ -46,6 +50,22 @@ def hl_test(y_true, y_pred, g=10, threshold=0.5):
 
     return pval
 
+def tn_score(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    return cm[0, 0]
+
+def fp_score(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    return cm[0, 1]
+
+def fn_score(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    return cm[1, 0]
+
+def tp_score(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    return cm[1, 1]
+
 def logit_p(skm, x):
     '''
     Print the p-value for sklearn logit model
@@ -68,7 +88,7 @@ def logit_p(skm, x):
     se = np.sqrt(np.diag(vcov))
     t =  coefs/se  
     pval = (1 - norm.cdf(abs(t))) * 2
-    print(pd.DataFrame(pval, 
+    logging.info(pd.DataFrame(pval, 
                        index=['intercept','population','pctUrban', 
                               'perCapInc', 'PctPopUnderPov'], 
                        columns=['p-value']))
@@ -81,10 +101,17 @@ def get_scorer(metric=None, average='macro'):
         'accuracy': make_scorer(accuracy_score),
         'f1': make_scorer(f1_score, average=average),
         'auc': make_scorer(roc_auc_score, average=average),
-        'hl': make_scorer(hl_test, needs_proba=True, greater_is_better=False)
+        'hl': make_scorer(hl_test, needs_proba=True, greater_is_better=False),
+        'tn': make_scorer(tn_score),
+        'fp': make_scorer(fp_score),
+        'fn': make_scorer(fn_score),
+        'tp': make_scorer(tp_score),
     }
-    if metric in ['precision', 'recall', 'accuracy', 'f1', 'auc', 'hl']:
+    metrix_choice = ['precision', 'recall', 'accuracy', 
+                     'f1', 'auc', 'hl', 'tp', 'tn', 'fp', 'fn']
+    if metric in metrix_choice:
         return scorers[metric]
+
     elif metric=='all':
         metrics = ['precision', 'recall', 'f1', 'auc']
         averaging = ['macro', 'micro', 'weighted']
@@ -95,18 +122,23 @@ def get_scorer(metric=None, average='macro'):
         
         scoring['accuracy'] = get_scorer('accuracy')
         scoring['hl'] =  get_scorer('hl')
+        scoring['tn'] =  get_scorer('tn')
+        scoring['tp'] =  get_scorer('tp')
+        scoring['fp'] =  get_scorer('fp')
+        scoring['fn'] =  get_scorer('fn')
         return scoring
+
     elif metric=='gridsearch':
         # return all metrix with the specific averaging type
         return scorers
     else:
-        print("Error: Please correctly define metric. Cannot get scorer!")
+        logging.info("Error: Please correctly define metric. Cannot get scorer!")
 
-def evaluate_cv(estimator, X, y, n_folds=5, random_state=None):
+def evaluate_cv(estimator, X, y, n_folds=-1, random_state=None):
     
     # Get dictionary of scorers
     scoring = get_scorer(metric='all')
-    
+
     # Define CV
     skf = StratifiedKFold(n_splits=n_folds, 
                           shuffle=True if isinstance(random_state, int) else False, 
@@ -120,5 +152,33 @@ def evaluate_cv(estimator, X, y, n_folds=5, random_state=None):
 
     # Get mean of folds performance
     metrix_dict = {k: np.mean(v) for k, v in cv_results.items()}
-
     return metrix_dict
+
+def evaluate(y_true, y_pred, y_pred_proba):
+    
+    metrics = ['precision', 'recall', 'f1', 'auc']
+    averaging = ['macro', 'micro', 'weighted']
+    scores = {'precision': precision_score, 
+              'recall': recall_score, 
+              'f1': f1_score, 
+              'auc': roc_auc_score}
+
+    score_names = ['-'.join([m, a]) for m in metrics for a in averaging]
+    scores = [scores[m](y_true, y_pred, average=a) 
+              for m in metrics for a in averaging] 
+    
+    metrix_dict = dict(zip(score_names, scores))
+    
+    metrix_dict['accuracy'] = accuracy_score(y_true=y_true, y_pred=y_pred)
+    metrix_dict['hl'] = hl_test(y_true=y_true, y_pred=y_pred_proba[:, 0])
+    metrix_dict['tn'] = tn_score(y_true=y_true, y_pred=y_pred)
+    metrix_dict['tp'] = tp_score(y_true=y_true, y_pred=y_pred)
+    metrix_dict['fp'] = fp_score(y_true=y_true, y_pred=y_pred)
+    metrix_dict['fn'] = fn_score(y_true=y_true, y_pred=y_pred)
+
+    # rename dict keys
+    new_metrix_dict = {}
+    for k, v  in metrix_dict.items():
+        new_metrix_dict['test_' + k] = v
+
+    return new_metrix_dict

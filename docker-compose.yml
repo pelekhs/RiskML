@@ -130,7 +130,7 @@ services:
         networks:
             - backend
             - frontend
-        command: bash -c "./run_app/train_serve.sh" # "./run_app/train_asset.sh" #"./run_app/run_all.sh" #"tail -F skata"
+        command: bash -c "./run_app/run_all.sh" # "./run_app/train_asset.sh" #"./run_app/run_all.sh" #"tail -F skata"
         # train_asset.sh
         # waits for mlflow server
         # do git clone here in the end

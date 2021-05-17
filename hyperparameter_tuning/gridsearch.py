@@ -8,6 +8,8 @@ import click
 import numpy as np
 from sklearn.model_selection import train_test_split
 from dotenv import load_dotenv
+import logging
+
 
 # please change in application -> run globals in the beginning and learn how to import from parent folder!!!!
 parentdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -142,28 +144,38 @@ def ML_tuner_CV(X, y,
               default=default_arguments['train_size'],
               help="Training set percentage of the dataset size"
               )
+
 def run(task, metric, averaging, imputer, n_folds, n_jobs_cv, random_state, train_size):
 
     # Load data
-    df, veris_df = load_datasets()
-    #print(veris_df.filter(like="asset.variety.").columns)
+    veris_df = load_dataset(collapsed=collapsed_csv_name)
     
     # Manage task predictors and features
     predictors, targets = get_task(task, veris_df)
+
     print("Targets:", targets)
     
     # Custom Logs
     collapsed_features = {'Collapsed features': predictors}
+
     subtasks = {'Subtasks': targets}
+    
     with open('simple_feature_set.txt', 'w') as f:
+    
         json.dump(collapsed_features, f, indent=4)
+    
     with open('targets.txt', 'w') as f:
+    
         json.dump(subtasks, f, indent=4)
     
     metric_id = ("-".join[metric, averaging]) if (metric not in ['hl', 'accuracy']) else metric
+    
     for target in targets:
+    
         print(f'\n************************\n{target}\n************************')
+    
         with mlflow.start_run(run_name=f'{target} | {metric}-{averaging}'):
+    
             # Preprocessing
             X, y = preprocessing(df, veris_df,
                                     predictors, 
@@ -172,8 +184,10 @@ def run(task, metric, averaging, imputer, n_folds, n_jobs_cv, random_state, trai
                                     imputer)
             # Log tags and params
             mlflow.set_tag("mlflow.runName", f'{target} | {metric}-{averaging}')
+    
             mlflow.log_artifact('simple_feature_set.txt', 
                                 artifact_path='features')
+    
             mlflow.log_artifact('targets.txt', 
                                 artifact_path='targets')
 
@@ -185,16 +199,20 @@ def run(task, metric, averaging, imputer, n_folds, n_jobs_cv, random_state, trai
                                 'imputer': imputer,
                                 'n_folds': n_folds,
                                 'random_state': random_state})
+    
             mlflow.log_params({'tuning_metric': metric_id,
                                 'imputer': imputer,
                                 'n_folds': n_folds,
                                 'random_state': random_state})
+    
             # check y statistics and log
-            mlflow_tags = check_y_statistics(y)
-            mlflow.set_tags(mlflow_tags)
+            error_tags = check_y_statistics(y)
+    
+            mlflow.set_tags(error_tags)
 
             # skip loop if y is small
             if mlflow_tags['error_class'] != '-':
+    
                 continue
 
             # train / test if train percentage < 1
