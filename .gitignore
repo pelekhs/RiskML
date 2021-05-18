@@ -150,5 +150,8 @@ ache__/
 # vscode
 .vscode/
 
-# mlflow
+# MLflow
 mlruns/
+
+# data
+veris_df.csv
