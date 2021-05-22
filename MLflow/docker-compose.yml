@@ -45,7 +45,7 @@ services:
     pgdb:
         container_name: pgdb
         restart: always
-        build: ./docker-db
+        build: ./docker_db
         image: pgdb
         volumes:
             - database:/var/lib/postgresql/data
@@ -63,7 +63,7 @@ services:
 
     mlflow_server:
         restart: always
-        build: ./docker-mlflow-server
+        build: ./docker_mlflow_server
         image: mlflow_server
         container_name: mlflow_server
         ports:
