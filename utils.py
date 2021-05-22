@@ -301,9 +301,8 @@ def mlflow_register_model(model_name):
             old_model_properties['run_id']
             ).data
         
-        if (old_model_data.metrics['test_f1-macro'] <= \
-            current_model_data.metrics['test_f1-macro']) \
-            and current_model_data.metrics['test_hl'] <= 0.05: 
+        if old_model_data.metrics['test_f1-macro'] < current_model_data.metrics['test_f1-macro'] \
+            and current_model_data.metrics['test_hl'] >= -0.05 and current_model_data.metrics['test_hl'] <= 0:
 
             # Register new model and transit it to production
             new_registered_model = mlflow.register_model(
