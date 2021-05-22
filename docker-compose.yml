@@ -125,12 +125,10 @@ services:
             - pgdb
             - mlflow_server
         working_dir: '/code/'
-        volumes:
-            - ./:/code
         networks:
             - backend
             - frontend
-        command: bash -c "./run_app/run_all.sh" # "./run_app/train_asset.sh" #"./run_app/run_all.sh" #"tail -F skata"
+        command: bash -c "sleep 3 && ./run_app/run_all.sh" # "./run_app/train_asset.sh" #"./run_app/run_all.sh" #"tail -F skata"
         # train_asset.sh
         # waits for mlflow server
         # do git clone here in the end
@@ -143,5 +141,4 @@ networks:
 volumes:
     database:
     artifact-store: 
-    code:
     
