@@ -28,7 +28,29 @@ v = VERIS(json_dir=JSON_DIR)
 def download_veris_csv(url=VERIS_DF_URL,
                        csv_dir=CSV_DIR,
                        veris_df_csv=VERIS_DF):
-    
+    """ 
+    Downloads the official veris_df dataset (boolean VCDB dataset) 
+    from the vz-risk github and returns it as DataFrame.
+
+    Parameters
+    ---------- 
+        url:
+            The remote path of the zipped folder containing the csv file
+            (e.g. 'https://raw.githubusercontent.com/vz-risk/VCDB/master/data/csv/vcdb.csv.zip')
+        
+        csv_dir: str / path
+            The local path to store the csv to
+        
+        veris_df_csv: str
+            The name of the csv file
+
+    Returns
+    ---------- 
+    DataFrame
+        The veris_df dataset as Pandas DataFrame  
+
+    """
+
     logging.info(f'Downloading from: {url}')
     
     urllib.request.urlretrieve(url, 
@@ -44,7 +66,26 @@ def download_veris_csv(url=VERIS_DF_URL,
 def create_veris_csv(json_dir=JSON_DIR,
                      csv_dir=CSV_DIR,
                      veris_df_csv=VERIS_DF):
-    
+    """ 
+    Creates veris_df type dataset (boolean VCDB dataset) and stores as csv.
+
+    Parameters
+    ---------- 
+        json_dir: str / path
+            The path of validated vcdb json files
+        
+        csv_dir: str / path
+            The path to store the produced csv
+        
+        veris_df_csv: str
+            The name of the csv file
+
+    Returns
+    ---------- 
+    DataFrame
+        The veris_df dataset as Pandas DataFrame  
+    """
+
     if  json_dir == None or csv_dir == None:
     
         logging.info("Need json and collapsed csv directories")
@@ -62,47 +103,46 @@ def create_veris_csv(json_dir=JSON_DIR,
 def load_dataset(csv_dir=CSV_DIR, 
                  veris_df_csv=VERIS_DF, 
                  nrows=None):
-    
+    """ 
+    Loads veris_df type csv (boolean VCDB dataset) from disk as a 
+    Pandas DataFrame.
+
+    Parameters
+    ---------- 
+        csv_dir: str / path
+            The path to read the csv from
+        
+        veris_df_csv: str
+            The name of the csv file
+
+    Returns
+    ---------- 
+    DataFrame
+        The loaded veris_df dataset as Pandas DataFrame  
+
+    """    
     veris_df = pd.read_csv(os.path.join(csv_dir, veris_df_csv),
                            index_col=0,
                            low_memory=False,
                            nrows=nrows)
     
-    # df = pd.read_csv(os.path.join(csv_dir, collapsed),
-    #                  low_memory=False,
-    #                  index_col=0,
-    #                  nrows=nrows)
-    
     return veris_df
-
-def create_veris_csv(json_dir=JSON_DIR,
-                     csv_dir=CSV_DIR,
-                     veris_df_csv=VERIS_DF):
-    
-    if  json_dir == None or csv_dir == None:
-    
-        logging.info("Need json and collapsed csv directories")
-    
-        exit()
-    
-    v = VERIS(json_dir=json_dir)
-    
-    veris_df = v.json_to_df(verbose=False)
-    
-    veris_df.to_csv(os.path.join(csv_dir, veris_df_csv))
-    
-    return veris_df
-
-def mapper(x, asset_variety):
-    
-    splitted = x.split(" - ")
-    
-    splitted[0] = f"asset.assets.variety.{asset_variety}"
-    
-    return ".".join(splitted)
 
 def check_y_statistics(y):
-    
+    """ 
+    Checks if output variable is statistically capable for training.
+
+    Parameters
+    ---------- 
+        y: Pandas Series
+            The output Series of the supervised task 
+    Returns
+    ---------- 
+    Dict
+        Dictionary that type of anomaly and statistics of y  
+
+    """
+
     error_class = '-'
     
     if len(y) < 30:
@@ -123,77 +163,7 @@ def check_y_statistics(y):
     
     return mlflow_tags
 
-def ColToOneHot(collapsed, veris_df, father_col="action", replace=True) -> object:
-    
-    """ Transforms all features (whose names are children of the term defined
-    from 'father_col' argument) of the collapsed version of the dataset to One Hot 
-    Encodings using their values in the full veris_df version. A new dataset can be created
-    for the encodings or alternatively the can be replaced on the original dataset. Args:
-    
-    Parameters
-    ---------- 
-    collapsed: DataFrame
-        The collapsed version of the dataset that requires transformation of specific 
-        columns. This version is normally produced by the json_to_collapsed R script
-    
-    veris_df: DataFrame
-        The veris_df dataset
-
-    father_col: str
-        The prefix that defines which column will be transformed to One Hot Encodings
-        e.g. father_col = 'action' gets transformed to action.Error, action.Hacking, ...
-
-    replace: boolean 
-        Choose weather to replace the column on the same dataframe or return a new one 
-        with the encoded columns
-    
-    Returns
-    -------
-    Dataframe
-        Initial dataframe with column replaced by encodings or fresh dataframe of encodings only      
-    """
-
-    if father_col.startswith("asset.assets.variety."):
-
-        asset_variety = father_col.split(".")[-1]
-        
-        columns = veris_df.filter(like=f"asset.assets.variety.{asset_variety[0]} -").columns
-        
-        renamed_columns = columns.map(lambda x: mapper(x, asset_variety))
-        
-        renamer = dict(zip(columns.tolist(), renamed_columns.tolist()))
-        
-        veris_df.rename(mapper=renamer,
-                        axis="columns",
-                        inplace=True)
-    if replace:
-        
-        collapsed_ = collapsed.copy()
-        
-        for attr in list(v.enum_summary(veris_df, father_col).iloc[:, 0]):
-        
-            sub = father_col + "." + attr
-        
-            collapsed_[sub] = veris_df[sub].astype(int)
-        
-        collapsed_.drop(columns=father_col, inplace=True)
-        
-        return collapsed_
-    
-    else:
-    
-        OneHot = pd.DataFrame()
-    
-        for attr in list(v.enum_summary(veris_df, father_col).iloc[:, 0]):
-    
-            sub = father_col + "." + attr
-    
-            OneHot[sub] = veris_df[sub]
-    
-        return OneHot.astype(int)
-
 def train_test_split_and_log(X, y, train_size, random_state):
-    
     """ Performs train / test split and logs the datasets using the 
         MLflow tracking API 
     Parameters
@@ -271,7 +241,16 @@ def train_test_split_and_log(X, y, train_size, random_state):
 
 
 def mlflow_register_model(model_name):
+    """ Compares the current model to the production model that is registered
+        in mlflow models.
+    Parameters
+    ---------- 
+        model_name: str
+            The model name (same with target name)
 
+    Returns
+    ---------- 
+    """
     logging.info('\nChecking whether to register model...\n')
 
     client = MlflowClient()
@@ -282,11 +261,11 @@ def mlflow_register_model(model_name):
 
     # lookup for previous version of model
     try:
-
+        # last model version is the one in production
         old_model_properties = dict(
             client.search_model_versions(
             f"name='{model_name}'"
-            )[0])
+            )[-1])
 
     except IndexError:
 
