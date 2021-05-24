@@ -128,7 +128,7 @@ services:
         networks:
             - backend
             - frontend
-        command: bash -c "sleep 3 && ./run_app/run_all.sh" # "./run_app/train_asset.sh" #"./run_app/run_all.sh" #"tail -F skata"
+        command: bash -c "sleep 3 && ./run_app/run_all.sh"
 
 networks:
     frontend:
