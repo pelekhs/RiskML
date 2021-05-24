@@ -40,9 +40,44 @@ default_arguments = {
     'pca': 0
 }
 
-def train_evaluate(X, y, estimator, hyperparams, train_size, 
-                   n_folds, split_random_state, n_components):
-    
+def train_evaluate(X, y, estimator, train_size, n_folds, 
+                   split_random_state, n_components):
+    """ 
+    Performs a training pipeline and evaluation for soft classification
+    given a dataset y|X, the classifier  model and other training parameters
+
+    Parameters
+    ---------- 
+        X: Pandas DataFrame
+            Input dataset
+
+        y: Pandas Series
+            Output vector (probabilistic values)
+        
+        estimator: sklearn classifier
+
+        train_size: float
+            The portion of the training set 0 < train_size <= 1
+            If train_size == 1 cross validation is performed instead of
+            train / test split. 
+
+        n_folds: int
+            Number of folds in case of cross validation (in case train_size == 1)
+
+        split_random_state: int
+            The random state for train / test split or CV 
+
+        n_components: int
+            Components of the PCA step of the pipeline. If 0 then PCA
+            is not performed
+
+    Returns
+    ---------- 
+    Dict
+        Dictionary of all evaluation metrics   
+
+    """
+    logging.info(type(estimator))
     logging.info("Checking capability of training")
     
     error_tags = check_y_statistics(y)
@@ -200,7 +235,17 @@ def train_evaluate_register(task,
                             split_random_state, 
                             n_folds,
                             pca):
+    """ 
+    Performs all training, evaluation and model registration with MLflow
 
+    Parameters
+    ---------- 
+        See click argument parser
+
+    Returns
+    ----------   
+
+    """
     # Set tracking URI
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     logging.info("Current tracking uri: {}".format(mlflow.get_tracking_uri()))
@@ -252,8 +297,7 @@ def train_evaluate_register(task,
         # Train
         train_evaluate(X, 
                        y, 
-                       estimator, 
-                       hyperparams, 
+                       estimator,
                        train_size, 
                        n_folds, 
                        split_random_state, 
