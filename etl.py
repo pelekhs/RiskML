@@ -1,6 +1,4 @@
 import pandas as pd
-import os
-import datetime
 import numpy as np
 import re
 import logging 
@@ -36,9 +34,9 @@ class etl_maker():
         return veris_df_
 
     def get_task(self, task, veris_df):
-        
-        """ Defines the names of the predictor and target columns of veris_df dataset
-            according to a selected task. Args:
+        """ 
+        Defines the names of the predictor and target columns of veris_df dataset
+        according to a selected task. Args:
         
         Parameters
         ---------- 
@@ -127,8 +125,27 @@ class etl_maker():
         
         return predictors, targets
 
-    def build_X(self, veris_df, predictors):\
-
+    def build_X(self, veris_df, predictors):
+        """ 
+        Defines the input part of the training dataset 
+        according to the selected predictors. Args:
+        
+        Parameters
+        ---------- 
+            predictors: list of str
+                Predictor variable types for training
+                Choose amongst: ['asset.variety', 
+                                 'asset.assets.variety', 
+                                 'action', 
+                                 'action.x.variety']
+            
+            veris_df: DataFrame 
+                The veris_df dataset
+        
+        Returns
+        ---------- 
+        DataFrame: The input dataset as a Pandas DataFrame
+        """
         veris_df_ = veris_df.copy()
 
         X = pd.DataFrame(index=veris_df_.index)
@@ -202,7 +219,23 @@ class etl_maker():
         return X
 
     def fetch_binary_target(self, veris_df, target_name):
+        """ 
+        Creates the output variable dataset given its name.
+        Also deletes any rows where parent column is not activated. . Args:
         
+        Parameters
+        ---------- 
+            predictors: str
+                Selected output column name
+            
+            veris_df: DataFrame 
+                The veris_df dataset
+        
+        Returns
+        ---------- 
+        Series: The output vector as a Pandas Series
+        DataFrame: The filtered veris_df (deleted rows if parent not activated)
+        """  
         veris_df_ = veris_df.copy()
         
         y = veris_df_[target_name]
@@ -215,7 +248,7 @@ class etl_maker():
         
         dirty_rows = np.bitwise_and(dirty_rows_1, dirty_rows_2)
 
-        # delete rows where the target's father is not activated (hierarchical classification model)
+        # delete rows where the target's parent is not activated (hierarchical classification model)
         irrelevant_rows = np.zeros(len(y)).astype(bool)
 
         if 'asset.assets.variety.' in target_name:
@@ -226,15 +259,15 @@ class etl_maker():
                        'asset.assets.variety.M ': 'asset.variety.Media',
                        'asset.assets.variety.P ': 'asset.variety.Person'}
         
-            father_col = mapping[target_name.split('-')[0]]
+            parent_col = mapping[target_name.split('-')[0]]
         
-            irrelevant_rows = (veris_df_[father_col] == 0).values
+            irrelevant_rows = (veris_df_[parent_col] == 0).values
 
         elif re.match(r'action.*\.variety', target_name):
         
-            father_col = f'action.{target_name.split(".")[1].capitalize()}'
+            parent_col = f'action.{target_name.split(".")[1].capitalize()}'
         
-            irrelevant_rows = (veris_df_[father_col] == 0).values
+            irrelevant_rows = (veris_df_[parent_col] == 0).values
         
         rows_to_drop = np.bitwise_or(irrelevant_rows, dirty_rows)
         
@@ -336,7 +369,7 @@ def etl(veris_df,
     # Merge SQLi, Brute force, DoS, Backdoor&C2
     veris_df = pp.merge_bruteforce_ddos_C2(veris_df) if merge else veris_df
 
-    # Output feature (if child get only rows where father activated)
+    # Output feature (if child get only rows where parent activated)
     y, veris_df = pp.fetch_binary_target(veris_df, target)
 
     ## Creation of predictor dataset / Feature Selection
