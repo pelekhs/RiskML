@@ -114,6 +114,7 @@ services:
             - 5030:5030
             - 5031:5031
             - 5032:5032
+            - 5100:5100
         environment:
             MLFLOW_TRACKING_URI: http://mlflow_server:5000
             MLFLOW_S3_ENDPOINT_URL: http://minio:9000
@@ -128,7 +129,7 @@ services:
         networks:
             - backend
             - frontend
-        command: bash -c "sleep 3 && ./run_app/run_all.sh"
+        command: bash -c "sleep 3 && (python3 api/server.py & python3 shell_script_composer.py && ./app/run/run_all.sh)"
 
 networks:
     frontend:

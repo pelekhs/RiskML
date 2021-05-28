@@ -153,5 +153,14 @@ ache__/
 # MLflow
 mlruns/
 
+# Shell scripts
+app/run/*
+app/discover/*
+app/kill/*
+!app/kill/.gitkeep
+!app/run/.gitkeep
+!app/discover/.gitkeep 
+
+
 # data
 veris_df.csv
