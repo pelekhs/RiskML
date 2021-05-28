@@ -1,0 +1,60 @@
+swagger: "2.0"
+info:
+  description: This is the swagger file that goes with the server code
+  version: "1.0.0"
+  title: Swagger ReST API
+consumes:
+  - application/json
+produces:
+  - application/json
+
+basePath: /api
+
+# Paths supported by the server application
+paths:
+  /functions/ls:
+    put:
+      operationId: functions.fun_ls
+      tags:
+        - Bash_Functions
+      summary: Run the $ls bash command
+      description: Run the $ls bash command
+      responses:
+        200:
+          description: Successfully run $ls
+        401:
+          description: $ls failed
+
+  /functions/pwd:
+    put:
+      operationId: functions.fun_pwd
+      tags:
+        - Bash_Functions
+      summary: Run the $pwd bash command
+      description: Run the $pwd bash command
+      responses:
+        200:
+          description: Successfully run $pwd
+        401:
+          description: $pwd failed
+  
+
+  /functions/{command}:
+    put:
+      operationId: functions.fun
+      tags:
+        - Bash_Functions
+      summary: Run the bash command that was passed as a parameter
+      description: Run the bash command that was passed as a parameter
+      parameters:
+        - name: command
+          in: path
+          type: string
+          description: Command to be run
+          required: true
+      responses:
+        200:
+          description: command successfully run 
+        401:
+          description: command failed
+  
