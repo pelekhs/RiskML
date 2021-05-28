@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import recall_score, accuracy_score
 from lightgbm import LGBMClassifier
-import pprint
 import os
 from dotenv import load_dotenv
 from mlflow.tracking import MlflowClient
@@ -77,7 +76,6 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
         Dictionary of all evaluation metrics   
 
     """
-    logging.info(type(estimator))
     logging.info("Checking capability of training")
     
     error_tags = check_y_statistics(y)
