@@ -1,5 +1,5 @@
 #!/bin/bash
-source run_app/train_n_serve_utils.sh
+source run_app/utils.sh
 echo "Training action..."
 train_n_serve "action" "Malware" "$1" 5020
 train_n_serve "action" "Hacking" "$1" 5021

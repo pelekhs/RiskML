@@ -1,5 +1,5 @@
 #!/bin/bash
-source run_app/train_n_serve_utils.sh
+source run_app/utils.sh
 echo "Training assets..."
 train_n_serve "asset.variety" "Server" "$1" 5010
 train_n_serve "asset.variety" "User Dev" "$1" 5011
