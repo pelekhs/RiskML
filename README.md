@@ -1,5 +1,5 @@
-# vcdb
+# VCDB
 
 ## Machine learning model serving for cyber risk assessment
 
-### Trained on the VCDB dataset
+### Various ML models Trained on the VCDB dataset
