@@ -126,10 +126,12 @@ services:
             - pgdb
             - mlflow_server
         working_dir: '/code/'
+        # volumes:
+        #     - ./:/code/ # remoooooooooooooooooooove
         networks:
             - backend
             - frontend
-        command: bash -c "sleep 3 && (python3 api/server.py & python3 shell_script_composer.py && ./app/run/run_all.sh)"
+        command: bash -c "sleep 5 && (python3 api/server.py & python3 shell_scripts/shell_script_composer.py && ./shell_scripts/init_models.sh )"
 
 networks:
     frontend:
