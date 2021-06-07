@@ -5,98 +5,126 @@ import json
 # 3rd party modules
 from flask import abort, make_response
 
-def refresh_vcdb():
-	bashCommand = "./run_app/refresh_vcdb.sh"
+def updateVCDB():
+	""" 
+    API function to update the VCDB dataset by cloning the VCDB github
+	repo from scratch
+
+    Parameters
+    ---------- 
+	-
+
+    Returns
+    ---------- 
+    HTTP response
+    
+	"""
+	bashCommand = "./shell_scripts/updateVCDB.sh"
 	process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
 	output, error = process.communicate()
 
-	if "failed" in process.output:
+	if "failed" in str(output) or "Error" in str(output):
 		abort(
-            401, f" Failed with error: {process.stderr}"
-        )
+            401, 'Error updating VCDB'
+	    	)
+
+	if error != None:
+		abort(
+            401, f'Failed to kill serving process with error: {error1}'
+        	)
+	
 	return make_response(
-			f"Successfully cloned current VCDB version", 200
+			output, 200
     		)	
 
-def get_running_models():
-	with open('../config.json') as json_file:
+def getModels():
+	""" 
+    API function to get the state of currently served models
+
+    Parameters
+    ---------- 
+	-
+
+    Returns
+    ---------- 
+    HTTP response
+    
+	"""
+	with open('config.json') as json_file:
 		config = json.load(json_file)
 		ports_models = config['ports_models']
-
+	
 	open_ports_models = {}
-	for port, model_name in ports_models.items():
-		bashCommand = f'./run_app/discover_{model_name}'
-		process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-		output, error = process.communicate()
-		if process.output != None:
-			open_ports_models[port] = model_name
+	
+	for port, model_id in ports_models.items():
 		
+		bashCommand = f'./shell_scripts/discover/discover_{model_id}.sh'
+		try:
+			process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+			output, error = process.communicate()
+		except FileNotFoundError:
+			abort(
+            404, 'Model not found'
+        	)
+		
+		if output != b'':
+			open_ports_models[str(port)] = model_id
+		elif error != None:
+			abort(
+            401, f"ls failed with error: {process.stderr}"
+        	)
+		else:
+			open_ports_models[str(port)] = 'No service'
+	
 	return make_response(
 			json.dumps(open_ports_models), 200
     		)	
 
-def retrain_model(model_name):
-	# here I need as a parameter the name or port of service or 'all' to train em all
-	# I also need to kill the selected models first !!!!
-	bashCommand = "./run_app/kill.sh"
-	process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-	output, error = process.communicate()
+def retrainModels(model_id):
+	""" 
+    API function to trigger model retraining by model_id or all.
 
-	if process.output != None:
+    Parameters
+    ---------- 
+	model_id: str
+		The name of the target VCDB column
+
+    Returns
+    ---------- 
+    HTTP response
+    
+	"""
+
+	bashCommand = f"./shell_scripts/kill/kill_{model_id}.sh"
+	try:
+		process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+		output1, error1 = process.communicate()
+	except FileNotFoundError:
+			abort(
+            	404, 'Kill script not found. Probably model name is not correct!'
+        		)
+	
+	bashCommand = f"./shell_scripts/run/run_{model_id}.sh"
+	try:
+		process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+		output1, error1 = process.communicate()
+	except FileNotFoundError:
 		abort(
-            401, f" Failed with error: {process.stderr}"
-        )
-	return make_response(
-			f"Successfully stopped serving models", 200
-    		)
+            404, 'Run script not found'
+        	)
+	process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+	output2, error2 = process.communicate()
 
-# first way to run a bash command: simply with .run()
-# does the job almost for all cases. 
-
-# It returns a CompletedProcess object which has various methods 
-# which allow you to retrieve the exit status, the standard output, 
-# and a few other results and status indicators from the finished subprocess.
-def fun_ls():
-	bashCommand = "ls"
-	process = subprocess.run(bashCommand)
-
-	if process.stderr != None:
+	if error1 != None:
 		abort(
-            401, f"ls failed with error: {process.stderr}"
-        )
-	return make_response(
-			f"ls run like a charm", 200
-    		)
-
-# second way to run: with subprocess.Popen. 
-# process.communicate captures the results
-
-def fun_pwd():
-	bashCommand = "pwd"
-	process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-	output, error = process.communicate()
-
-	if process.stderr != None:
+            401, f'Failed to kill serving process with error: {error1}'
+        	)
+	
+	if error2 != None:
 		abort(
-            401, f"pwd failed with error: {process.stderr}"
-        )
+			402, f'Failed to train model with error: {error2}'
+		)
+	
 	return make_response(
-			f"pwd run like a charm", 200
+			f"Successfully trained models", 200
     		)
-
-def fun(command):
-	bashCommand = command
-	process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-	output, error = process.communicate()
-
-	if error != None:
-		abort(
-            401, f"{command} failed with error: {error}"
-        )
-	return make_response(
-			f"{command} run like a charm", 200
-    		)
-
-if __name__ == "__main__":
-	fun_ls()
-	fun_pwd()
