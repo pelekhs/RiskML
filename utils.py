@@ -39,10 +39,7 @@ def download_veris_csv(url=VERIS_DF_URL,
             (e.g. 'https://raw.githubusercontent.com/vz-risk/VCDB/master/data/csv/vcdb.csv.zip')
         
         csv_dir: str / path
-            The local path to store the csv to
-        
-        veris_df_csv: str
-            The name of the csv file
+            The local path to store the csv tono-serving
 
     Returns
     ---------- 
@@ -139,7 +136,7 @@ def check_y_statistics(y):
     Returns
     ---------- 
     Dict
-        Dictionary that type of anomaly and statistics of y  
+        Dictionary of type of anomaly and statistics of y  
 
     """
 
@@ -271,8 +268,8 @@ def mlflow_register_model(model_name):
 
         old_model_properties = None
 
-    # if there is a previous model we need to compare and then update or not
-    if old_model_properties != None:
+    # if there is a previous model in production we need to compare and then update or not
+    if old_model_properties != None and old_model_properties['current_stage'] == 'Production':
         
         logging.info("\n Comparing with previous production model...\n ")
         
@@ -307,7 +304,7 @@ def mlflow_register_model(model_name):
 
             logging.info('New model is rejected. The previous one is kept in production! \n')
 
-    else: # in case there is no other model immediately register current model
+    else: # in case there is no other model in production immediately register current model
         
         logging.info('\n')
         mlflow.register_model(
