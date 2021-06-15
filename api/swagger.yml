@@ -1,117 +1,62 @@
-swagger: "2.0"
+openapi: 3.0.1
 info:
-  description: This is the swagger file that goes with the server code
-  version: "1.0.0"
   title: Swagger ReST API
-consumes:
-  - application/json
-produces:
-  - application/json
-  - text/plain
-
-basePath: /api
-
-# Paths supported by the server application
+  description: This is the swagger file that goes with the server code
+  version: 2.0.0
+servers:
+- url: /api
 paths:
   /functions/updateVCDB:
     get:
-      operationId: functions.updateVCDB
       tags:
-        - Update database
+      - Update database
       summary: Update to latest VCDB version from github
-      description: Clones the github repo Https://github.com/vz-risk/VCDB 
-                   and renews the state of VCDB which is used for the
-                   training of RCRA ML models
+      description: Clones the github repo Https://github.com/vz-risk/VCDB and renews
+        the state of VCDB which is used for the training of RCRA ML models
+      operationId: functions.updateVCDB
       responses:
         200:
           description: Successfully updated the database
+          content: {}
         401:
           description: Failed to update the database due to Github issues
-
+          content: {}
   /functions/getModels:
     get:
-      operationId: functions.getModels
       tags:
-        - View Models
+      - View Models
       summary: Get the list of models that are being served right now
-      description: Returns the list of active ports  together with the
-                   names of models that are served by each one. The shell 
-                   scripts that are invoked are located in the repo's 
-                   'shell_scripts/discover' directory.
+      description: Returns the list of active ports  together with the names of models
+        that are served by each one. The shell scripts that are invoked are located
+        in the repo's 'shell_scripts/discover' directory.
+      operationId: functions.getModels
       responses:
-        '200':
+        200:
           description: The list of served models per port
-        '401':
+          content: {}
+        401:
           description: Failed to fetch the list of served models
-
+          content: {}
   /functions/retrainModels/{model_id}:
     put:
-      operationId: functions.retrainModels
       tags:
-        - Retrain models
-      parameters:
-        - name: model_id
-          in: path
-          type: string
-          description: Model to be retrained
-          required: true
+      - Retrain models
       summary: Retrain the selected model
-      description: Stops serving, retrains and serves again the selected
-                   model or all models if 'all' is given as a parameter.
+      description: Stops serving, retrains and serves again the selected model or
+        all models if 'all' is given as a parameter.
+      operationId: functions.retrainModels
+      parameters:
+      - name: model_id
+        in: path
+        description: Model to be retrained
+        required: true
+        schema:
+          type: string
       responses:
-        '200':
+        200:
           description: Best model trained and served
-        '401':
+          content: {}
+        401:
           description: Failed to update the database due to Github issues
-
-# components:
-#   schemas:
-#     ModelList:
-#       type: object
-#       additionalProperties:
-#         type: string
-  # /functions/ls:
-  #   put:
-  #     operationId: functions.fun_ls
-  #     tags:
-  #       - Bash_Functions
-  #     summary: Run the $ls bash command
-  #     description: Run the $ls bash command
-  #     responses:
-  #       200:
-  #         description: Successfully run $ls
-  #       401:
-  #         description: $ls failed
-
-  # /functions/pwd:
-  #   put:
-  #     operationId: functions.fun_pwd
-  #     tags:
-  #       - Bash_Functions
-  #     summary: Run the $pwd bash command
-  #     description: Run the $pwd bash command
-  #     responses:
-  #       200:
-  #         description: Successfully run $pwd
-  #       401:
-  #         description: $pwd failed
-  
-
-  # /functions/{command}:
-  #   put:
-  #     operationId: functions.fun
-  #     tags:
-  #       - Bash_Functions
-  #     summary: Run the bash command that was passed as a parameter
-  #     description: Run the bash command that was passed as a parameter
-  #     parameters:
-  #       - name: command
-  #         in: path
-  #         type: string
-  #         description: Command to be run
-  #         required: true
-  #     responses:
-  #       200:
-  #         description: command successfully run 
-  #       401:
-  #         description: command failed
+          content: {}
+components: {}
