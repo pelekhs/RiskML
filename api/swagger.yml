@@ -57,6 +57,9 @@ paths:
           description: Best model trained and served
           content: {}
         401:
-          description: Failed to update the database due to Github issues
+          description: Failed to kill serving process
+          content: {}
+        402:
+          description: Failed to train model
           content: {}
 components: {}
