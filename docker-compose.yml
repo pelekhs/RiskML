@@ -85,12 +85,12 @@ services:
             - backend
         command: bash -c 
             "mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgdb:5432/${POSTGRES_DATABASE} --host 0.0.0.0 --default-artifact-root s3://mlflow-bucket/"
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:5000"]
-            interval: 10s
-            timeout: 10s
-            start_period: 3s
-            retries: 3
+        # healthcheck:
+        #     test: ["CMD", "curl", "--fail", "http://localhost:5000"]
+        #     interval: 10s
+        #     timeout: 10s
+        #     start_period: 3s
+        #     retries: 3
 
     mlflow_code:
         restart: always
