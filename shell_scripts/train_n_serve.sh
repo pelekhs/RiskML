@@ -21,7 +21,9 @@ train_n_serve() {
     fi
     if [[ $6 != "--no-serving" ]]
     then
-        ./kill/kill_$modelname.sh
+        echo ${modelname}skataskataskata\n\n\n
+        # kill not useful, can't find file and in any case serving stop by itself
+        # $curdir/kill/kill_$modelname.sh
         mlflow models serve -m "models:/$modelname/Production" --host 0.0.0.0 --port $4 --no-conda &
     fi
 }
