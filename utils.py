@@ -160,7 +160,7 @@ def check_y_statistics(y):
     
     return mlflow_tags
 
-def train_test_split_and_log(X, y, train_size, random_state):
+def train_test_split_and_log(X, y, train_size, random_state, shuffle=True):
     """ Performs train / test split and logs the datasets using the 
         MLflow tracking API 
     Parameters
@@ -177,6 +177,9 @@ def train_test_split_and_log(X, y, train_size, random_state):
         random_state: int
             Random state for the split 
 
+        shuffle: bool
+            Whether to shuffle or not during splitting
+
     Returns
     ---------- 
     Case 1: Dataframe, Dataframe, Series, Series
@@ -188,15 +191,15 @@ def train_test_split_and_log(X, y, train_size, random_state):
     """
 
     # Train / Test split
+    stratify = y if shuffle else None
     if train_size < 1:
         X_train, X_test, y_train, y_test = \
             train_test_split(X, 
                              y, 
                              train_size=train_size,
-                             test_size=1-train_size,
-                             shuffle=True,
-                             stratify=y, 
-                             random_state=random_state
+                             stratify=stratify, 
+                             random_state=random_state,
+                             shuffle=shuffle
                              )
     else:
         X_train = X
@@ -235,7 +238,6 @@ def train_test_split_and_log(X, y, train_size, random_state):
             f.close() 
 
     return X_train, X_test, y_train, y_test
-
 
 def mlflow_register_model(model_name):
     """ Compares the current model to the production model that is registered
