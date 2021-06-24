@@ -84,7 +84,7 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
     
     # skip loop if y is small
     error = error_tags['error_class']
-    
+
     if error != '-':
         
         raise(ValueError(f"{error}, preferrably seek another way of learning!\n"))    
@@ -96,9 +96,12 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
     if train_size < 1:
         
         logging.info("Splitting dataset\n")
-        
+        # shuffle is set to False to keep date order
         X_train, X_test, y_train, y_test = \
-            train_test_split_and_log(X, y, train_size, split_random_state)
+            train_test_split_and_log(X, y, 
+                                     train_size, 
+                                     split_random_state, 
+                                     shuffle=False)
 
     else:
 
