@@ -1,0 +1,145 @@
+version: '3.7'
+
+services:
+
+    minio:
+        image: minio/minio:latest
+        container_name: myminio
+        volumes:
+            - artifact-store:/mlflow-bucket
+        ports:
+            - "9000:9000"
+        environment:
+            MINIO_ROOT_USER: minio-id
+            MINIO_ROOT_PASSWORD: minio-key
+            AWS_ACCESS_KEY_ID: 'minio-id'
+            AWS_SECRET_ACCESS_KEY: 'minio-key'
+        networks:
+            - backend
+        command: server /mlflow-bucket
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 10s
+            timeout: 10s
+            start_period: 3s
+            retries: 3
+
+    create_bucket:
+        image: minio/mc:latest
+        depends_on:
+            - minio      
+        networks:
+            - backend    
+        environment:
+            MINIO_ROOT_USER: minio-id
+            MINIO_ROOT_PASSWORD: minio-key
+            PORT: 9000
+        entrypoint: >
+            /bin/sh -c "
+            /usr/bin/mc config host rm local;
+            /usr/bin/mc config host add --quiet --api s3v4 local http://myminio:9000 minio-id minio-key;
+            /usr/bin/mc rb --force local/mlflow-bucket/;
+            /usr/bin/mc mb --quiet local/mlflow-bucket/;
+            /usr/bin/mc policy set public local/mlflow-bucket;
+            "        
+    pgdb:
+        container_name: pgdb
+        restart: always
+        build: ./docker-db
+        image: pgdb
+        volumes:
+            - database:/var/lib/postgresql/data
+        ports:
+            - 5432:5432
+        expose:
+            - "5432"
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DATABASE: ${POSTGRES_DATABASE}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        networks:
+            - backend
+
+    mlflow_server:
+        restart: always
+        build: ./docker-mlflow-server
+        image: mlflow_server
+        container_name: mlflow_server
+        ports:
+            - 5000:5000
+        expose:
+            - 5000
+        environment:
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_DATABASE: ${POSTGRES_DATABASE}
+            MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+            AWS_ACCESS_KEY_ID: minio-id
+            AWS_SECRET_ACCESS_KEY: minio-key
+        depends_on: 
+            - minio
+            - pgdb
+        networks:
+            - frontend
+            - backend
+        command: bash -c 
+            "mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgdb:5432/${POSTGRES_DATABASE} --host 0.0.0.0 --default-artifact-root s3://mlflow-bucket/"
+        # healthcheck:
+        #     test: ["CMD", "curl", "--fail", "http://localhost:5000"]
+        #     interval: 10s
+        #     timeout: 10s
+        #     start_period: 3s
+        #     retries: 3
+
+    mlflow_code:
+        restart: always
+        build: .    
+        image: mlflow_code
+        container_name: mlflow_code
+        ports:
+            - 5010:5010
+            - 5011:5011
+            - 5012:5012
+            - 5013:5013
+            - 5014:5014
+            - 5015:5015
+            - 5020:5020
+            - 5021:5021
+            - 5022:5022
+            - 5023:5023
+            - 5024:5024
+            - 5025:5025
+            - 5026:5026
+            - 5030:5030
+            - 5031:5031
+            - 5032:5032
+            - 5100:5100
+        environment:
+            MLFLOW_TRACKING_URI: http://mlflow_server:5000
+            MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+            AWS_ACCESS_KEY_ID: 'minio-id'
+            AWS_SECRET_ACCESS_KEY: 'minio-key'
+        depends_on: 
+            - minio 
+            - create_bucket
+            - pgdb
+            - mlflow_server
+        working_dir: '/code/'
+        # volumes:
+        #     - ./:/code/ # remoooooooooooooooooooove
+        networks:
+            - backend
+            - frontend
+        command: bash -c "sleep 5 && (python3 api/server.py & python3 shell_scripts/shell_script_composer.py && ./shell_scripts/init_models.sh )"
+
+networks:
+    frontend:
+        driver: bridge
+    backend:
+        driver: bridge
+# volumes are initiated locally in /var/lib/docker/volumes
+volumes:
+    database:
+    artifact-store: 
+    

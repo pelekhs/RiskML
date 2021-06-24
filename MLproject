@@ -1,0 +1,72 @@
+name: thesis
+
+conda_env: conda.yml
+
+# docker_env:
+#   image: mlflow-docker-example-environment
+#   volumes: ["/local/path:/container/mount/path"]
+#   environment: [["NEW_ENV_VAR", "new_var_value"], "VAR_TO_COPY_FROM_HOST_ENVIRONMENT"]
+    
+entry_points:
+
+  etl_data:
+    parameters:
+      recreate_veris: {type: bool, default=False}
+    command: python3 etl.py --csv-dir {csv_dir} --json-dir {json_dir} --recreate-veris {recreate_veris}
+
+  ML_asset:
+    parameters:
+      predictors: {type: string, default: ' '}
+      train_size: {type: float, default: 1.0}
+      random_state: {type: int, default: -1}
+      metric: {type: string, default: 'f1'}
+      metric_averaging: {type: string, default: 'macro'}
+      model: {type: string, default: 'SVM'}
+    command: |
+        python3 ML_asset_l2.py --predictors {predictors} --random-state {random_state} --train-size {train_size} --metric {metric} --metric-averaging {metric_averaging}
+
+  ML_asset_l2:
+    parameters:
+      features: {type: string}
+      train_size: {type: float, default: 0.8}
+      tuning_metric: {type: string, default: 'f1'}
+      tuning_averaging: {type: string, default: 'macro'}
+    command: |
+        python3 ML_asset_l2.py --features {features} --stratify {stratify} --train-size {train_size} --tuning-metric {tuning_metric} --tuning-averaging {tuning_averaging}
+
+  gridsearch:
+    parameters:
+      task: {type: string, default: 'action'}
+      metric: {type: string, default: 'auc'}
+      imputer: {type: string, default: 'dropnan'}
+      averaging: {type: string, default: 'macro'}
+      random_state: {type: int, default: 0}
+      train_size: {type: float, default: 1.0}
+      n_jobs_cv: {type: int, default: -1}
+      n_folds: {type: int, default: 5}
+    command: |
+      python3 hyperparameter_tuning/gridsearch.py --task {task} --train-size {train_size} --imputer {imputer} --n-jobs-cv {n_jobs_cv} --n-folds {n_folds} --metric {metric} --averaging {averaging} 
+
+  train:
+    parameters:
+      task: {type: string, default: 'asset.variety'}
+      target: {type: string, default: ' '}
+      algo: {type: string, default: 'LGBM'}
+      hyperparams: {type: string, default: '{}'}
+      imputer: {type: string, default: 'dropnan'}
+      train_size: {type: float, default: 1}
+      split_random_state: {type: int, default: 0}
+      n_folds: {type: int, default: 0}
+      merge: {type: int, default: 1}
+      pca: {type: int, default: 0}
+    command: |
+      python3 train.py --pca {pca} --merge {merge} --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n-folds {n_folds}
+  
+  main:
+    parameters:
+      ml_asset_algorithm: {type: string, default: "RF"}
+      ml_asset_l2_algorithm: {type: string, default: "SVM"}
+    command: |
+        python3 main.py \
+            --ml-asset-alg {ml_asset_algorithm} \
+            --ml-asset-l2-alg {ml_asset_l2_algorithm}

@@ -1,0 +1,65 @@
+openapi: 3.0.1
+info:
+  title: Swagger ReST API
+  description: This is the swagger file that goes with the server code
+  version: 2.0.0
+servers:
+- url: /api
+paths:
+  /functions/updateVCDB:
+    get:
+      tags:
+      - Update database
+      summary: Update to latest VCDB version from github
+      description: Clones the github repo Https://github.com/vz-risk/VCDB and renews
+        the state of VCDB which is used for the training of RCRA ML models
+      operationId: functions.updateVCDB
+      responses:
+        200:
+          description: Successfully updated the database
+          content: {}
+        401:
+          description: Failed to update the database due to Github issues
+          content: {}
+  /functions/getModels:
+    get:
+      tags:
+      - View Models
+      summary: Get the list of models that are being served right now
+      description: Returns the list of active ports  together with the names of models
+        that are served by each one. The shell scripts that are invoked are located
+        in the repo's 'shell_scripts/discover' directory.
+      operationId: functions.getModels
+      responses:
+        200:
+          description: The list of served models per port
+          content: {}
+        401:
+          description: Failed to fetch the list of served models
+          content: {}
+  /functions/retrainModels/{model_id}:
+    put:
+      tags:
+      - Retrain models
+      summary: Retrain the selected model
+      description: Stops serving, retrains and serves again the selected model or
+        all models if 'all' is given as a parameter.
+      operationId: functions.retrainModels
+      parameters:
+      - name: model_id
+        in: path
+        description: Model to be retrained
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: Best model trained and served
+          content: {}
+        401:
+          description: Failed to kill serving process
+          content: {}
+        402:
+          description: Failed to train model
+          content: {}
+components: {}

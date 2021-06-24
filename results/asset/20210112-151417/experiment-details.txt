@@ -1,1 +1,0 @@
-TARGETS = ["asset.variety.Server", "asset.variety.Media", "asset.variety.User Dev"]

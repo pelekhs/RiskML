@@ -1,0 +1,35 @@
+{
+    "Tuning metric": "f1-macro",
+    "Best_scores": {
+        "SVM": 0.8695318780533052,
+        "Knn": 0.8636803714195853,
+        "RF": 0.8706605885685,
+        "LR": 0.8769339180865243,
+        "LGBM": 0.8626224822543842,
+        "GNB": 0.5962989156058462
+    },
+    "Best_params": {
+        "SVM": {
+            "C": 1,
+            "kernel": "rbf"
+        },
+        "Knn": {
+            "metric": "minkowski",
+            "n_neighbors": 13,
+            "weights": "uniform"
+        },
+        "RF": {
+            "bootstrap": true,
+            "max_depth": 24,
+            "max_features": "auto",
+            "min_samples_leaf": 1,
+            "min_samples_split": 20,
+            "n_estimators": 100
+        },
+        "LR": {
+            "max_iter": 100
+        },
+        "LGBM": {},
+        "GNB": {}
+    }
+}
