@@ -1,0 +1,441 @@
+---
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: true
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    number_sections: true
+    df_print: kable
+classoption: a4paper
+fontsize: 10.5pt
+geometry: margin=1.2in
+documentclass: article
+header-includes:
+   - \usepackage{caption}
+   - \captionsetup[figure]{font=small}
+---
+
+```{r setup, include=FALSE}
+  #install.packages("devtools")
+  #devtools::install_github("jayjacobs/verisr")
+  #devtools::install_github("onlyphantom/verisr2") 
+  #install.packages("dplyr", "tidyverse", "magrittr", "verisr", "verisr2", "DataCombine", "RColorBrewer", "gridExtra",
+  #                 "grid", "data.table", "ggplot2", "repr", "rworldmap", dependencies = T)
+  # install.packages("rworldmap")
+  options(warn=-1)
+  library(magrittr)
+  library(dplyr)
+  library(verisr)
+  library(RColorBrewer)
+  library(gridExtra)
+  library(grid)
+  library(data.table)
+  library(ggplot2)
+  source("funs.r")
+  library(repr)
+  library(verisr2)
+  library(tidyverse)
+  library(DataCombine)
+  library(rworldmap)
+  library(sjmisc)
+``` 
+
+# Analysis
+
+## Data loading 
+```{r load_data, warning=TRUE, include=FALSE}
+  # read from json
+  schema.loc <- "../../VCDB/vcdb-merged.json"
+  vcdb.dir<-"../../VCDB/data/json/validated"
+  vcdb <- verisr::json2veris(dir=vcdb.dir, schema=schema.loc)
+  
+  # create collapsed version 
+  collapsed <- collapse_vcdb(vcdb)
+  
+  # get pattern dataset
+  vcdb_p<- cbind(vcdb, getpattern(vcdb))
+  
+```
+## Timelines
+
+### Distribution of incidents over the years
+
+```{r IncidentsTS, echo=TRUE, warning=TRUE}
+options(repr.plot.width=8, repr.plot.height=4)
+t <- getenum(vcdb, "timeline.incident.year")
+#t$enum <- as.year(t$enum)
+t$enum <- as.numeric(as.character(t$enum))
+t <- t[order(t$enum),]
+ggplot(t, aes(x=enum, y=x)) + geom_point(pch=18, size=3, color="#FC4E07") +
+  geom_line(size=1, color="#FC4E07") + 
+  labs(y = "Number of incidents", x = "Year", title=
+         "Timeseries of incident frequency") + 
+  theme_minimal() + scale_x_continuous(expand=c(0,0), limits=c(2000, 2020))
+```
+
+### Breach vs incident through the years (Breach means that information was disclosed)
+```{r Breaches, echo=TRUE, warning=TRUE}
+vcdb %>%
+    dplyr::group_by(attribute.confidentiality.data_disclosure.Yes) %>%
+    dplyr::count(timeline.incident.year) %>%
+    dplyr::ungroup() %>%
+    dplyr::rename(Event = attribute.confidentiality.data_disclosure.Yes) %>%
+    dplyr::mutate(Event = ifelse(Event, "Breach", "Incident")) %>%
+    ggplot() +geom_bar(aes(x=timeline.incident.year, y=n, group=Event, fill=Event), 
+                     stat="identity", position="dodge") +
+    labs(title="VCDB Breaches and Incidents by Incident Year", x="Count", y="Year") +
+    scale_x_continuous(expand=c(0,0), limits=c(2000, 2021)) +
+    scale_y_continuous(expand=c(0,0)) +
+    scale_fill_brewer(palette=14) + theme_minimal() +
+    theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank()
+    )
+```
+Yes it is reflected to number of breaches as well. However, some breaches might lead to million records lost some others to a small number of them. For example in 2013 Yahoo hack accounted for one billion records lost. The next closest incident (Target data breach) resulted in over 110 million records lost.
+
+### Records lost over the years
+
+Let's investigate the number of lost records by year:
+
+```{r Breaches, echo=TRUE, warning=TRUE, fig.width=11}
+t <- collapsed[,(lost.records=sum(attribute.confidentiality.data_total)),
+           by=.(timeline.incident.year)]
+t <- t[order(t$timeline.incident.year),]
+ggplot(t, aes(x=timeline.incident.year, y=V1, group=1)) +
+  geom_point(pch=18, size=3, color="#FC4E07") +
+  geom_line(size=1, color="#FC4E07") + 
+  labs(y = "Number of lost records", x = "Year", title=
+         "Timeseries of total number of lost records per incident") + 
+  theme_minimal()
+```
+We see that 2011 and 2002 are the worst years in terms of lost records despite the fact that 2013 was top in terms of incident frequency. Obviously the average number of records breached per incident was much higher in 2020. Proof:
+
+```{r Records, echo=TRUE, warning=TRUE, fig.width=11}
+t <- ready[,.(lost.records=mean(attribute.confidentiality.data_total)),
+           by=.(timeline.incident.year)]
+t <- t[order(t$timeline.incident.year),]
+
+ggplot(t, aes(x=timeline.incident.year, y=lost.records, group=1)) +
+  geom_point(pch=18, size=3, color="#FC4E07") +
+  geom_line(size=1, color="#FC4E07") + 
+  labs(y = "Lost record", x = "Year", title=
+       "Timeseries of average number of lost records per incident") + 
+  theme_minimal()
+```
+### External variety
+
+```{r Records, echo=TRUE, warning=TRUE}
+ext.variety <- getenum(vcdb, "actor.external.variety")
+simplebar(ext.variety, "Variety of external hacking actors", "grey")
+```
+
+### Attack pattern - Actor category
+
+```{r attack_pattern, echo=TRUE, warning=TRUE}
+a <- getenum_df(vcdb_p, c("actor", "pattern"))
+a <- a[!grepl("1", a$pattern),] 
+gg <- ggplot(a, aes(x=pattern, x, fill=actor))
+gg <- gg + geom_bar(stat="identity", position="dodge") + 
+    guides(fill=guide_legend(title="Pattern"))
+gg <- gg + labs(title="Distribution of attack patterns", 
+                subtitle = "grouped by actor category", 
+                x="Pattern", y="Count")
+gg2 <- gg  + theme_minimal() + scale_fill_brewer(palette=14) +
+     coord_flip()
+print(gg2)
+```
+
+Errors come mostly from internal actors (rational conclusion: errors at work, spam, phishing, etc..)
+
+## Action - Asset
+```{r, action_asset, echo=TRUE, warning=TRUE}
+enum2grid(vcdb, c("action", "asset.variety")) + 
+  guides(fill=guide_legend(title="Count")) +
+  theme_minimal() + labs(title="Distribution of incidents",
+  subtitle="grouped by variety and action", y="Asset variety", x="Action")
+```
+
+## Action - Organisation size
+```{r, action_asset, echo=TRUE, warning=TRUE}
+a <- getenum_df(vcdb, c("action", "victim.orgsize"))
+gg <- ggplot(a, aes(x=action, y=x, fill=victim.orgsize))
+gg <- gg + geom_bar(stat="identity", position="fill") + 
+    guides(fill=guide_legend(title="Victim organization size"))
+gg <- gg + labs(title="Distribution of actions", 
+                subtitle = "grouped by victim organization size", 
+                x="Action", y="Percentage")
+gg <- gg  + theme_minimal() + scale_fill_brewer(palette=14) +
+    scale_y_continuous(labels=scales::percent) + coord_flip()
+print(gg)
+```
+
+## Victim countries
+
+```{r, victim_countries, echo=TRUE, warning=TRUE}
+a <- getenum_df(vcdb, c("victim.country"))
+a <- a[c("enum","x")]
+names(a) <- c("enum", "Incident intensity")
+mapped_data <- joinCountryData2Map(a, joinCode = "ISO2", 
+    nameJoinColumn = "enum")
+par(mai=c(0,0.2,0.4,1),xaxs="i",yaxs="i")
+mapCountryData(mapped_data, nameColumnToPlot = "Incident intensity",
+               mapTitle = "Heatmap of incident ocurrence around the globe",
+               colourPalette= brewer.pal(n = -10, name = "Reds"), 
+               addLegend = F)
+```
+Not much to assume. Such statistics heavily depend on the population and industry size of each country. In any case all developed countries suffer from data breaches as they posess developed information systems.
+
+## Victim industry analysis
+### Initial Distribution Barplot
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+# We add pattern columns
+ind.name <- getenum(vcdb, c("victim.industry.name"))
+ggplot(ind.name, aes(x = enum, y=x)) + geom_bar(width=0.8, stat="identity") + geom_text(aes(label=paste(as.character(round(x/n[1]*100,1)), "%", sep="")), nudge_y=100, size=3.8) +
+labs(title="Barplot of incidents", subtitle= "grouped by victim industries",
+     x="Victim Industry", y="Count") + coord_flip()
+```
+### Victim industry compact barplots (aggregated smaller industries)
+
+```{r, compact, echo=TRUE, warning=TRUE}
+# We add pattern columns
+b <- getenum(vcdb, c("victim.industry2"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum, b, sum)
+b$n <- n1
+
+gg <- ggplot(b, aes(x=enum, y=x))
+gg <- gg + geom_bar(stat="identity", fill="grey")
+gg <- gg + labs(x="Industry", y="Incident Count",
+  title = "Compact barplot of incidents",
+  subtitle="grouped by victim industries",
+  caption="Industries with insignificant number of incidents have been merged into 'Other'") +
+  geom_text(aes(label=paste(as.character(round(x/n[1]*100,0)), "%", sep="")), 
+    nudge_y=130, size=3.8) + coord_flip() + theme_minimal()
+print(gg)
+```
+
+### Distribution of incidents over the years by industry
+
+```{r, barplot, echo=TRUE, warning=TRUE, fig.width=12}
+t <- ready %>%
+    dplyr::group_by(victim.industry.name) %>%
+    dplyr::count(timeline.incident.year) %>%
+    dplyr::ungroup() %>% data.table()
+t$victim.industry.name <- mapping_new(t$victim.industry.name)
+t <- aggregate(.~victim.industry.name+timeline.incident.year, t, sum)
+
+ggplot(t, aes(x=timeline.incident.year, y=n, group=victim.industry.name)) +
+  geom_point(pch=18, size=3, aes(color=victim.industry.name)) +
+  geom_line(size=1, aes(color=victim.industry.name)) + 
+  labs(y = "Number of incidents", x = "Year",
+       title="Timeseries of incident frequencies",
+       subtitle="grouped by victim industries") + theme_minimal()
+```
+
+2013 top year of incidents! Health care did not fall as much as the others after that.
+
+### Victim industry - Asset Variety
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb, c("victim.industry2", "asset.variety"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+b <-b[!(b$enum=="NA" | b$enum1=="NA"),] 
+ggplot(b) + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents",
+                         subtitle="grouped by industry and asset variety", 
+                         y="Asset variety", x="Victim industry")+
+  guides(fill=guide_legend(title="Count")) +
+  theme_minimal() +
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+### Victim industry - Action
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb, c("victim.industry2", "action"))
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+b <-b[!(b$enum=="NA" | b$enum1=="NA"),] 
+
+ggplot(b) + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents",
+                         subtitle="Grouped by industry and action", 
+                         y="Victim Industry", x="Action")+
+  guides(fill=guide_legend(title="Count")) +
+  theme_minimal() +
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45)) 
+#grid.arrange(arrangeGrob(p1+theme(legend.position="none"),
+#p2 + theme(legend.position="none"), nrow=1), top=textGrob("Distribution of incidents"))
+```
+
+### Victim industry - Motive
+
+```{r, barplot, echo=TRUE, warning=TRUE, fig.width=12}
+i<- getenum(vcdb, c("victim.industry2", "actor.internal.motive"))
+#convert NAICS to Name
+n1 <- i$n[1]
+i$enum <- mapping_compact(i$enum)
+i <- aggregate(.~enum1+enum, i, sum)
+i$n <- n1
+i <-i[!(i$enum=="NA" | i$enum1=="NA"),] 
+
+e<- getenum(vcdb, c("victim.industry2", "actor.external.motive"))
+#convert NAICS to Name
+n1 <- e$n[1]
+e$enum <- mapping_compact(e$enum)
+e <- aggregate(.~enum1+enum, e, sum)
+e$n <- n1
+e <-e[!(e$enum=="NA" | e$enum1=="NA"),] 
+
+p1 <- ggplot(e) + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(subtitle="Grouped by industry and external motive", 
+                         y="External Motive", x="Victim industry")+
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45)) 
+
+p2 <-  ggplot(i) + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(subtitle="Grouped by industry and internal motive", 
+                         y="Internal Motive", x="Victim industry")+
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45)) 
+grid.arrange(arrangeGrob(p1+theme(legend.position="none"),
+  p2 + theme(legend.position="none"), nrow=1), 
+  top=textGrob("Distribution of incident frequencies"))
+```
+
+
+Internal motive -> Fun!!
+
+Victim industry - Attack pattern
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb_p, c("victim.industry2", "pattern"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+
+b %>%
+  dplyr::filter(!is.na(enum1)) %>%
+  #dplyr::filter(!stringr::str_detect(enum, "Unknown")) %>%
+  #  dplyr::mutate(by = stringr::str_sub(by, 15)) %>%
+  ggplot() + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents by industry and pattern", 
+                         y="Victim Industry", x="Pattern")+
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+
+### Industry - Actor
+
+#### Victim industry - External Internal Partner
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+#need names to compact name mapping
+#ind.name <- mapping_compact(ind.name)
+vcdb %>%
+    dplyr::group_by(actor.External) %>%
+    dplyr::count(victim.industry.name) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(actor=ifelse(actor.External, "External", "Internal/Partner")) %>%
+  ggplot() +geom_bar(aes(x=victim.industry.name, y=n, group=actor.External, fill=actor.External), stat="identity") +
+    labs(title="VCDB Incident distribution", subtitle="grouped by industry and actor type",
+         x="Count", y="Year") +
+    scale_fill_manual(labels=c("External", "Internal / Partner"),
+                        values = brewer.pal(n = 2, name = "Pastel2")) +
+    guides(fill=guide_legend(title="Actor")) +
+    theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+
+#### Victim Industry - External actor variety
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb, c("victim.industry2", "actor.external.variety"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+
+b %>%
+  dplyr::filter(!is.na(enum1)) %>%
+  #dplyr::filter(!stringr::str_detect(enum, "Unknown")) %>%
+  #  dplyr::mutate(by = stringr::str_sub(by, 15)) %>%
+  ggplot() + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents",
+                         subtitle="grouped by industry and external actor variety", 
+                         x="Victim Industry", y="External actor variety")+
+  guides(fill=guide_legend(title="Count")) + theme_minimal() +
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb_p, c("victim.industry2", "pattern"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+
+b %>%
+  dplyr::filter(!is.na(enum1)) %>%
+  #dplyr::filter(!stringr::str_detect(enum, "Unknown")) %>%
+  #  dplyr::mutate(by = stringr::str_sub(by, 15)) %>%
+  ggplot() + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents by industry and pattern", 
+                         y="Victim Industry", x="Pattern")+
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+
+```{r, barplot, echo=TRUE, warning=TRUE}
+b <- getenum(vcdb_p, c("victim.industry2", "pattern"))
+#convert NAICS to Name
+n1 <- b$n[1]
+b$enum <- mapping_compact(b$enum)
+b <- aggregate(.~enum1+enum, b, sum)
+b$n <- n1
+
+b %>%
+  dplyr::filter(!is.na(enum1)) %>%
+  #dplyr::filter(!stringr::str_detect(enum, "Unknown")) %>%
+  #  dplyr::mutate(by = stringr::str_sub(by, 15)) %>%
+  ggplot() + geom_tile(aes(x=enum, y=enum1, fill=x)) +
+  geom_text(aes(x=enum, y=enum1, label=x)) +
+  scale_fill_gradient2() + coord_flip() +
+  theme_minimal() + labs(title="Distribution of incidents by industry and pattern", 
+                         y="Victim Industry", x="Pattern")+
+  theme(axis.text = element_text(),
+        axis.text.x = element_text(hjust=1, angle=45))
+```
+
