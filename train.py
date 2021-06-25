@@ -9,8 +9,8 @@ from sklearn.metrics import recall_score, accuracy_score
 from lightgbm import LGBMClassifier
 import os
 from dotenv import load_dotenv
-from mlflow.tracking import MlflowClient
 from sklearn.pipeline import Pipeline
+import shap
 
 import models
 from evaluation import evaluate_cv, evaluate
@@ -144,6 +144,15 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                             code_path=['inference.py'],
                             conda_env=mlflow_serve_conda_env, 
                             input_example=X.head(1))
+
+    # log SHAP explainer
+    # explainer = shap.KernelExplainer(model[-1].predict_proba, 
+    #                                  model[:2].fit_transform(X_train).values, 
+    #                                  link='logit')
+    
+    #mlflow.shap.log_explainer(explainer, artifact_path="model/explanation", signature=signature)
+    mlflow.shap.log_explanation(model[-1].predict, model[:2].fit_transform(X_train).values, artifact_path="model/explanation")
+    
 
     # Log parameters of used estimator
     mlflow.log_params(estimator.get_params())
