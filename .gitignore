@@ -164,3 +164,7 @@ shell_scripts/kill/*
 
 # data
 veris_df.csv
+X_train.csv
+X_test.csv
+y_train.csv
+y_test.csv
