@@ -10,7 +10,7 @@ from lightgbm import LGBMClassifier
 import os
 from dotenv import load_dotenv
 from sklearn.pipeline import Pipeline
-import shap
+from explanation.explainers import run_explainer
 
 import models
 from evaluation import evaluate_cv, evaluate
@@ -18,6 +18,7 @@ from etl import etl
 from preprocessing import OneHotTransformer, myPCA
 from utils import create_veris_csv, load_dataset, download_veris_csv, check_y_statistics, train_test_split_and_log, mlflow_register_model
 from inference import  ModelOut, mlflow_serve_conda_env
+from distutils import util
 
 # Reset mlflow tracking uri
 load_dotenv()
@@ -25,22 +26,16 @@ load_dotenv()
 # env variables
 MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI')
 
-
-# Default values
-default_arguments = {
-    'task': 'asset.variety',
-    'target': ' ',
-    'algo': 'LGBM',
-    'imputer': 'dropnan',
-    'merge': 'True',
-    'split_random_state': None,
-    'train_size': 0.8,
-    'n_folds': 0,
-    'pca': 0
-}
+# Parse default settings from training json
+# with open('./train_config.json') as json_file:
+#     default_arguments = json.load(json_file)\
+#     # str to bool
+#     default_arguments["merge"] = util.strtobool(default_arguments["merge"])
+#     default_arguments["explain"] = util.strtobool(default_arguments["explain"])
 
 def train_evaluate(X, y, estimator, train_size, n_folds, 
-                   split_random_state, n_components):
+                   split_random_state, n_components, explain,
+                   shap_data_percentage, shap_test_over_train_percentage):
     """ 
     Performs a training pipeline and evaluation for soft classification
     given a dataset y|X, the classifier  model and other training parameters
@@ -69,6 +64,13 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
         n_components: int
             Components of the PCA step of the pipeline. If 0 then PCA
             is not performed
+        
+        explain: boolean
+            Whether to use SHAP for explanations
+        
+        shap_data_percentage: float
+
+        shap_test_over_train_percentage: float
 
     Returns
     ---------- 
@@ -126,7 +128,7 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
         # Refit model to log it afterwards
         model = pipeline.fit(X_train, y_train) 
     
-    else: # CV evaluation for train_size < 1
+    else: # evaluation for train_size < 1 (no cross validation)
             
         model = pipeline.fit(X_train, y_train)
     
@@ -145,21 +147,38 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                             conda_env=mlflow_serve_conda_env, 
                             input_example=X.head(1))
 
-    # log SHAP explainer
-    # explainer = shap.KernelExplainer(model[-1].predict_proba, 
-    #                                  model[:2].fit_transform(X_train).values, 
-    #                                  link='logit')
-    
-    #mlflow.shap.log_explainer(explainer, artifact_path="model/explanation", signature=signature)
-    mlflow.shap.log_explanation(model[-1].predict, model[:2].fit_transform(X_train).values, artifact_path="model/explanation")
-    
-
     # Log parameters of used estimator
     mlflow.log_params(estimator.get_params())
     
     # Log metrix
     mlflow.log_metrics(metrix_dict)
 
+    # explainers
+    if explain and train_size < 1:
+        X_shap_test, model_shap = \
+            run_explainer(estimator, 
+                          X_train, 
+                          X_test, 
+                          y_train, 
+                          y_test, 
+                          pipeline,
+                          data_percentage=shap_data_percentage,
+                          test_percentage=shap_test_over_train_percentage
+                          )
+        
+        # check if there is an explaination produced 
+        # for the current estimator
+        #if not isinstance(X_shap_test, str) and not isinstance(model_shap, str):
+        print("Explainer finished")
+        # log explanation
+        mlflow.shap.log_explanation(model_shap.predict, 
+                                    X_shap_test, 
+                                    artifact_path="model/explanation")
+                                    
+        mlflow.log_artifacts("explain_plots", artifact_path="model/explanation")
+
+        #else:
+        #    logging.info("No explanations are supported for the current estimator")
     return metrix_dict
 
 @click.command()
@@ -178,13 +197,14 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                    'action.misuse.variety',
                    'action.physical.variety',
                    'action.malware.variety',
-                   'action.social.variety']),
-              default=default_arguments['task'],
+                   'action.social.variety', 
+                   'default']),
+            #   default=default_arguments['task'],
               help="Learning task"
               )
 @click.option("--target", "-tt", 
               type=str,
-              default=default_arguments['target'],
+            #   default=default_arguments['target'],
               help="Specific target variable. Omit this option to get list of options according to task"
               )
 @click.option("--algo", "-a", 
@@ -194,47 +214,71 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                   'LR', 
                   'GNB',
                   'LGBM', 
-                  'KNN']),
+                  'KNN', 
+                  'default']),
               multiple=False,
-              default=default_arguments['algo'],
+            #   default=default_arguments['algo'],
               help="Algorithm"
               )
 @click.option("--hyperparams", "-h", 
               type=str,
-              default='{}',
+            #   default=default_arguments["hyperparams"],
               help=""" "Hyperapameters of algorithm. e.g. '{"C": 1, "gamma": 0.1}' """
               )
 @click.option("--imputer", "-i", 
-              type=click.Choice(['dropnan']),
-              default=default_arguments["imputer"],
-              help="Independent targets of the model"
-              )
-@click.option("--merge", "-m", 
-              type=bool,
-              default=default_arguments["merge"],
-              help="Whether to merge Brute force, SQL injection and DoS columns for hacking and malware cases"
+              type=click.Choice(['dropnan', 'default']),
+            #   default=default_arguments["imputer"],
+              help="Imputation strategy"
               )
 @click.option("--train-size", "-ts", 
               type=float, 
-              default=default_arguments['train_size'],
-              help="Training set size"
+            #   default=default_arguments['train_size'],
+              help="Training set size. If equals 1 then cross validation is performed to evaluate the models"
               )
 @click.option("--split-random-state", "-rs",
               type=int, 
-              default=default_arguments['split_random_state'],
+            #   default=default_arguments['split_random_state'],
               help="Random state for splitting train / test or cv"
               )
 @click.option("--n-folds", "-f", 
               type=int,
-              default=default_arguments['n_folds'],
+            #   default=default_arguments['n_folds'],
               help="Number of folds for CV if there training set is all dataset"
               )
 @click.option("--pca", "-p", 
               type=int,
-              default=default_arguments['pca'],
+            #   default=default_arguments['pca'],
               help="Number of PCA components. 0 means no PCA"
               )
-
+@click.option("--explain", "-e", 
+              type=str,
+            #   default=default_arguments["explain"],
+              help="Whether to use SHAP for explanations. Requires train_size < 1 and it is generally a slow process. \
+                    Accepted values: ['y', 'yes', 't', 'true', 'on'] \
+                    and ['n', 'no', 'f', false', 'off']"
+              )
+@click.option("--merge", "-m", 
+              type=str,
+ #             default=default_arguments["merge"],
+              help="Whether to merge Brute force, SQL injection and DoS columns for hacking \
+                    and malware cases. Accepted values: ['y', 'yes', 't', 'true', 'on'] \
+                    and ['n', 'no', 'f', false', 'off']"
+              )
+@click.option("--train-size", "-ts", 
+              type=float, 
+            #   default=default_arguments['train_size'],
+              help="Training set size. If equals 1 then cross validation is performed to evaluate the models"
+              )
+@click.option("--shap-data-percentage", "-sdp", 
+              type=float, 
+            #   default=default_arguments['train_size'],
+              help="Dataset fraction to be used with SHAP for explanations"
+              )
+@click.option("--shap-test-over-train-percentage", "-sdp", 
+              type=float, 
+            #   default=default_arguments['train_size'],
+              help="Training set fraction to be used as test with SHAP for explanations"
+              )
 def train_evaluate_register(task, 
                             target, 
                             algo, 
@@ -244,9 +288,13 @@ def train_evaluate_register(task,
                             train_size, 
                             split_random_state, 
                             n_folds,
-                            pca):
+                            pca, 
+                            explain,
+                            shap_data_percentage, 
+                            shap_test_over_train_percentage):
     """ 
-    Performs all training, evaluation and model registration with MLflow
+    Performs all training, evaluation and model registration with MLflow. 
+    If parameters are unset values from train_config.json are imported 
 
     Parameters
     ---------- 
@@ -256,17 +304,21 @@ def train_evaluate_register(task,
     ----------   
 
     """
+    # Convert some str parameters to boolean (MLproject does not permit boolean)
+    explain = util.strtobool(explain)
+    merge = util.strtobool(merge)
+    
+    # Load hyperparam str as json
+    hyperparams = json.loads(hyperparams)
+    
     # Set tracking URI
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     logging.info("Current tracking uri: {}".format(mlflow.get_tracking_uri()))
-
-    # Process arguments
-    hyperparams = json.loads(hyperparams)
     
     if np.allclose(train_size, 1) and n_folds < 2:
-        mlflow.set_tags({'error class': 'train<1 & n_folds<2'})
+        mlflow.set_tags({'error class': 'train < 1 & n_folds < 2'})
         
-        raise(ValueError('\nSelect train_size < 1 or n_folds >= 2.\n'))
+        raise(ValueError('\nSelect train_size < 1 or n_folds > = 2.\n'))
 
     # Activate probability for svm
     if algo == 'SVM':
@@ -311,7 +363,10 @@ def train_evaluate_register(task,
                        train_size, 
                        n_folds, 
                        split_random_state, 
-                       pca)
+                       pca, 
+                       explain, 
+                       shap_data_percentage, 
+                       shap_test_over_train_percentage)
 
         # Update Model Registry if model is better than current
         mlflow_register_model(model_name=target)
