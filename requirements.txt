@@ -12,4 +12,5 @@ boto3==1.17.58
 connexion==2.7.0
 swagger-ui-bundle==0.0.8
 ipython==7.24.1
-
+matplotlib==3.4.2
+graphviz==0.16
