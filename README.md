@@ -195,7 +195,7 @@ Use docker-compose to deploy all services. In the root directory run:
 
 The deployed component architecture is the following:
 
-![RiskML_component_diagram](./report/images/RiskML_component_diagram)
+![RiskML_component_diagram](https://github.com/pelekhs/RiskML/blob/dev/report/images/RiskML_component_diagram.png)
 
 After the deployment the following UIs can be used:
 
