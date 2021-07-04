@@ -341,9 +341,15 @@ def etl(veris_df,
 
     logging.info("ETL\n")
     
+    # sort chronollogically for later training test set splits
+    veris_df = veris_df.sort_values(by=["timeline.incident.year", 
+                                        "timeline.incident.month", 
+                                        "timeline.incident.day"], 
+                                        ascending=True)
+
     # Initiate ETL class
     pp = etl_maker()
-    
+
     # Manage task predictors and features
     predictors, targets = pp.get_task(task, veris_df)
 

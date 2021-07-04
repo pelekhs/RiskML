@@ -1,5 +1,6 @@
+shap==0.39.0
 flask==2.0.1
-mlflow==1.16.0 
+mlflow==1.18.0 
 numpy==1.20.2
 pandas==1.2.4
 scikit-learn==0.24.1
@@ -10,5 +11,6 @@ verispy==0.1.13
 boto3==1.17.58
 connexion==2.7.0
 swagger-ui-bundle==0.0.8
-
-
+ipython==7.24.1
+matplotlib==3.4.2
+graphviz==0.16

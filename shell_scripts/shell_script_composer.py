@@ -6,7 +6,7 @@ import os
 script_folder = os.path.dirname(os.path.realpath(__file__))
 
 # Create run script
-with open(f'{script_folder}/../config.json') as json_file:
+with open(f'{script_folder}/../deployment_config.json') as json_file:
     config = json.load(json_file)
 algorithms = config['algorithms']
 ports_models = config['ports_models']
