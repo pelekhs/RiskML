@@ -30,7 +30,6 @@ def shap_lgbm(X_train,
                            valid_sets=[d_test], 
                            early_stopping_rounds=50, 
                            verbose_eval=1000)
-
     explainer = shap.TreeExplainer(model_shap)
     shap_values = explainer.shap_values(X_test)
 
@@ -95,7 +94,7 @@ def run_explainer(estimator,
     X_shap_test:  DataFrame
         Fraction (data_percentage) of the initial test dataset
     
-    model_shap: sklearn / LightGBM estimator class
+    model_shap: sklearn / LightGBM estimator class object
         The model that is fit to the shap dataset (in case of lgbm model is refitted)
     """
     
@@ -122,15 +121,14 @@ def run_explainer(estimator,
         plot_importance(booster=estimator)
         importance.savefig("explain_plots/importance_plot.png")                
         
-        model_shap, shap_values, explainer = \
+        model_shap, shap_values, _= \
             shap_lgbm(X_shap_train, 
                       X_shap_test, 
                       y_shap_train, 
                       y_shap_test)
     else:
         model = pipeline[-1]
-        print(model)
-        model_shap, shap_values, explainer = \
+        model_shap, shap_values, _ = \
             shap_generic(X_shap_train, 
                          X_shap_test, 
                          y_shap_train, 
@@ -169,7 +167,6 @@ def run_explainer(estimator,
     summary.show()
 
     #shap.plots.waterfall(shap_values[0], max_display=20)
-
     return X_shap_test, model_shap
 
 if __name__ == "__main__":
