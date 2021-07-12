@@ -165,7 +165,6 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                           data_percentage=shap_data_percentage,
                           test_percentage=shap_test_over_train_percentage
                           )
-        
         # check if there is an explaination produced 
         # for the current estimator
         #if not isinstance(X_shap_test, str) and not isinstance(model_shap, str):
@@ -174,11 +173,9 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
         mlflow.shap.log_explanation(model_shap.predict, 
                                     X_shap_test, 
                                     artifact_path="model/explanation")
-                                    
+                                      
         mlflow.log_artifacts("explain_plots", artifact_path="model/explanation")
 
-        #else:
-        #    logging.info("No explanations are supported for the current estimator")
     return metrix_dict
 
 @click.command()
@@ -197,8 +194,7 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                    'action.misuse.variety',
                    'action.physical.variety',
                    'action.malware.variety',
-                   'action.social.variety', 
-                   'default']),
+                   'action.social.variety']),
             #   default=default_arguments['task'],
               help="Learning task"
               )
@@ -214,8 +210,7 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                   'LR', 
                   'GNB',
                   'LGBM', 
-                  'KNN', 
-                  'default']),
+                  'KNN']),
               multiple=False,
             #   default=default_arguments['algo'],
               help="Algorithm"
