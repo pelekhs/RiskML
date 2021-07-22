@@ -155,16 +155,19 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
 
     # explainers
     if explain and train_size < 1:
-        X_shap_test, model_shap = \
-            run_explainer(estimator, 
-                          X_train, 
-                          X_test, 
-                          y_train, 
-                          y_test, 
-                          pipeline,
-                          data_percentage=shap_data_percentage,
-                          test_percentage=shap_test_over_train_percentage
-                          )
+        try:
+            X_shap_test, model_shap = \
+                run_explainer(estimator, 
+                              X_train, 
+                              X_test, 
+                              y_train, 
+                              y_test, 
+                              pipeline,
+                              data_percentage=shap_data_percentage,
+                              test_percentage=shap_test_over_train_percentage
+                              )
+        except TypeError:
+            pass
         # check if there is an explaination produced 
         # for the current estimator
         #if not isinstance(X_shap_test, str) and not isinstance(model_shap, str):

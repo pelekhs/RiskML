@@ -127,14 +127,15 @@ def run_explainer(estimator,
                       y_shap_train, 
                       y_shap_test)
     else:
-        model = pipeline[-1]
-        model_shap, shap_values, _ = \
-            shap_generic(X_shap_train, 
-                         X_shap_test, 
-                         y_shap_train, 
-                         y_shap_test, 
-                         model) 
-
+        # not functional yet
+        # model = pipeline[-1]
+        # model_shap, shap_values, _ = \
+        #     shap_generic(X_shap_train, 
+        #                  X_shap_test, 
+        #                  y_shap_train, 
+        #                  y_shap_test, 
+        #                  model) 
+        return
     # force = plt.figure()
     # shap.force_plot(explainer.expected_value, 
     #                 shap_values,
