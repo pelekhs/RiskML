@@ -35,7 +35,7 @@ entry_points:
       n_folds: {type: int, default: 5}
       merge: {type: str, default: "yes"}
       pca: {type: int, default: 0}
-      explain: {type: str, default: "yes"}
+      explain: {type: str, default: "no"}
       shap_data_percentage: {type: float, default: 0.1}
       shap_test_over_train_percentage: {type: float, default: 0.3}
     command: |
