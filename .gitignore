@@ -154,12 +154,7 @@ ache__/
 mlruns/
 
 # Shell scripts
-shell_scripts/run/*
-shell_scripts/discover/*
-shell_scripts/kill/*
-!shell_scripts/kill/.gitkeep
-!shell_scripts/run/.gitkeep
-!shell_scripts/discover/.gitkeep 
+shell_scripts/other/
 
 
 # data
