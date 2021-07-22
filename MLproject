@@ -35,8 +35,8 @@ entry_points:
       n_folds: {type: int, default: 5}
       merge: {type: str, default: "yes"}
       pca: {type: int, default: 0}
-      explain: {type: str, default: "yes"}
-      shap_data_percentage: {type: float, default: 0.5}
-      shap_test_over_train_percentage: {type: float, default: 0.2}
+      explain: {type: str, default: "no"}
+      shap_data_percentage: {type: float, default: 0.1}
+      shap_test_over_train_percentage: {type: float, default: 0.3}
     command: |
       python3 train.py --pca {pca} --merge {merge} --explain {explain} --task {task} --target {target} --algo {algo} --hyperparams {hyperparams} --imputer {imputer} --train-size {train_size} --split-random-state {split_random_state} --n-folds {n_folds} --shap-data-percentage {shap_data_percentage} --shap-test-over-train-percentage {shap_test_over_train_percentage}
