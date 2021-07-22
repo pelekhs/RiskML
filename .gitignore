@@ -154,8 +154,7 @@ ache__/
 mlruns/
 
 # Shell scripts
-shell_scripts/other/
-
+shell_scripts/other/*
 
 # data
 veris_df.csv
