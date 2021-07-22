@@ -50,7 +50,7 @@ def getModels():
     HTTP response
     
 	"""
-	with open('config.json') as json_file:
+	with open('deployment_.json') as json_file:
 		config = json.load(json_file)
 		ports_models = config['ports_models']
 	
