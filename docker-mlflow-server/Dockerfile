@@ -12,9 +12,9 @@ RUN apt-get install -y build-essential
 
 RUN pip install --upgrade pip
 
-RUN pip install psycopg2 
+RUN pip install psycopg2==2.8.2
 
 RUN pip install mlflow==1.16.0 
 
-RUN pip install boto3 
+RUN pip install boto3==1.17.60
     
