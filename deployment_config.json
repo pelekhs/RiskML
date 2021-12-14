@@ -1,5 +1,5 @@
 {
-"algorithms": "LGBM KNN RF SVM", 
+"algorithms": "LGBM", 
 "ports_models": {
    "5010" : "asset.variety.Server",
    "5011" : "asset.variety.User Dev",
