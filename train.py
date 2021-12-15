@@ -145,12 +145,12 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
     signature = infer_signature(X, model.predict_proba(X.iloc[0:2]))
 
     # input example exclusively for training step of pipeline
-    input_example = pipeline['PCA'].fit_transform(pipeline['one_hot_encoder'].fit_transform(X_train.head(1500))).head(1)
+    # input_example = pipeline['PCA'].fit_transform(pipeline['one_hot_encoder'].fit_transform(X_train.head(1500))).head(1)
     mlflow.pyfunc.log_model(artifact_path="model",
                             python_model=ModelOut(model=pipeline),
                             code_path=['inference.py'],
                             conda_env=mlflow_serve_conda_env, 
-                            input_example=input_example)
+                            input_example=X.head(1))
 
     # Log parameters of used estimator
     mlflow.log_params(estimator.get_params())
