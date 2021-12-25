@@ -25,6 +25,9 @@ load_dotenv()
 
 # env variables
 MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI')
+# os.environ["MLFLOW_TRACKING_URI"] = os.environ.get('MLFLOW_TRACKING_URI')
+# MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI')
+
 
 # Parse default settings from training json
 # with open('./train_config.json') as json_file:
@@ -141,6 +144,8 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
     # Get model signature and log model
     signature = infer_signature(X, model.predict_proba(X.iloc[0:2]))
 
+    # input example exclusively for training step of pipeline
+    # input_example = pipeline['PCA'].fit_transform(pipeline['one_hot_encoder'].fit_transform(X_train.head(1500))).head(1)
     mlflow.pyfunc.log_model(artifact_path="model",
                             python_model=ModelOut(model=pipeline),
                             code_path=['inference.py'],
@@ -166,19 +171,18 @@ def train_evaluate(X, y, estimator, train_size, n_folds,
                               data_percentage=shap_data_percentage,
                               test_percentage=shap_test_over_train_percentage
                               )
+                        # check if there is an explaination produced 
+            # for the current estimator
+            #if not isinstance(X_shap_test, str) and not isinstance(model_shap, str):
+            logging.info("Explainer finished")
+            # log explanation
+            mlflow.shap.log_explanation(model_shap.predict, 
+                                        X_shap_test, 
+                                        artifact_path="model/explanation")
+                                          
+            mlflow.log_artifacts("explain_plots", artifact_path="model/explanation")
         except TypeError:
             pass
-        # check if there is an explaination produced 
-        # for the current estimator
-        #if not isinstance(X_shap_test, str) and not isinstance(model_shap, str):
-        print("Explainer finished")
-        # log explanation
-        mlflow.shap.log_explanation(model_shap.predict, 
-                                    X_shap_test, 
-                                    artifact_path="model/explanation")
-                                      
-        mlflow.log_artifacts("explain_plots", artifact_path="model/explanation")
-
     return metrix_dict
 
 @click.command()

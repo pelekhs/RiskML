@@ -314,19 +314,15 @@ class etl_maker():
         veris_df_ = veris_df_.drop(['action.malware.variety.DoS'], axis=1)
 
         veris_df_['action.hacking.variety.SQLi'] = \
-            veris_df_.loc[:, ['action.hacking.variety.SQLi', 
-                              'action.malware.variety.SQL injection'
-                             ]
-                         ] \
-                     .max(axis=1)       
-        veris_df_ = veris_df_.drop(['action.malware.variety.SQL injection'], axis=1)
+            veris_df_.filter(like='action.hacking.variety.SQL').max(axis=1) 
+
+        if 'action.malware.variety.SQL injection' in veris_df_.columns:
+            veris_df_ = veris_df_.drop(['action.malware.variety.SQL injection'], axis=1)
 
         veris_df_['action.hacking.variety.Use of backdoor or C2'] = \
-            veris_df_.loc[:, ['action.hacking.variety.Use of backdoor or C2', 
+            veris_df_.filter(items=['action.hacking.variety.Use of backdoor or C2', 
                               'action.malware.variety.Backdoor',
-                              'action.malware.variety.C2'
-                             ]
-                         ] \
+                              'action.malware.variety.C2']) \
                      .max(axis=1)   
 
         veris_df_ = veris_df_.drop(['action.malware.variety.Backdoor'], axis=1)
