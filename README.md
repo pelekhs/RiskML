@@ -206,7 +206,7 @@ Users can monitor model performance, registered models and saved artifacts.
 * MINIO model storage: <br>
 http://localhost:9000 <br>
 username: minio-id <br>
-pass: minio-key
+pass: minio-key <br>
 Users can inspect the model storage file system via a Web UI.
 
 * Administrative interface of the deployment (Permits to check health of served models, update VCDB & retrain models): <br>
