@@ -210,9 +210,9 @@ pass: minio-key <br>
 Users can inspect the model storage file system via a Web UI.
 
 * Administrative interface of the deployment (Permits to check health of served models, update VCDB & retrain models): <br>
-http://localhost:5100/api/ui
+http://localhost:5100/api/ui <br>
 Operations of this API / UI are handled via shell scripts (``shell_scripts/discover`` and ``shell_scripts/kill`` folder) that are triggered by functions developed in the ``api/functions.py`` file. Shell scripts  are created by the ``shell_scripts/shell_script_composer.py`` file as mentioned above depending on the ``deployment_config.json`` configuration file.
 
 * Served models API endpoints: <br>
 http://localhost:<model_port>/invocations <br>
-Valid API call: ``curl http://0.0.0.0:5011/invocations -H 'Content-Type: application/json' -d @input_examples/asset.variety.json``
+Valid API call: ``curl http://0.0.0.0:5011/invocations -H 'Content-Type: application/json' -d @input_examples/asset.variety.X/model/input_example.json``
