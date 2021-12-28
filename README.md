@@ -100,7 +100,7 @@ Unset parameters result to their default values as defined in the "train" entryp
 The MLflow UI (http://localhost:5000) can be used for tracking model performance metrics. Models, artifacts and tracking parameters are stored locally.
 
 * **Valid run example**: <br>
-``mlflow run --experiment-name 'asset.variety' --entry-point train . -P task="asset.variety" -P target="Server" -P algo="LGBM" -P train_size=1 -P split_random_state=44 -P n_folds=5 -P pca=2 -P explain="yes" -P merge="yes"  --no-conda ``
+``mlflow run --experiment-name 'asset.variety' --entry-point train . -P task="asset.variety" -P target="Server" -P algo="LGBM" -P train_size=0.75 -P split_random_state=44 -P pca=2 -P explain="yes" -P merge="yes"  --no-conda ``
 
 Hyperparameter tuning
 ---------------------
